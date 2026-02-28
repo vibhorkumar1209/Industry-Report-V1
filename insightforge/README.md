@@ -139,6 +139,31 @@ git push -u origin codex/insightforge-mvp
 
 ## Deployment Notes
 
+## Quick Public Deploy
+
+### Render (Recommended)
+1. Open this one-click Blueprint import:
+   - `https://render.com/deploy?repo=https://github.com/vibhorkumar1209/Industry-Report-V1`
+2. In the Render Blueprint screen, set root directory to `insightforge` if prompted.
+3. Confirm services from [`render.yaml`](./render.yaml).
+4. Set secrets:
+   - `OPENAI_API_KEY`
+   - `ANTHROPIC_API_KEY`
+   - `PARALLEL_API_KEY`
+5. Deploy. Public URL will be the frontend Render URL (for example `https://insightforge-frontend.onrender.com`).
+
+### Railway
+1. Go to [Railway](https://railway.app/new) and choose **Deploy from GitHub Repo**.
+2. Select `vibhorkumar1209/Industry-Report-V1`.
+3. Create 5 services:
+   - `backend` (root dir: `insightforge/backend`)
+   - `worker` (root dir: `insightforge/backend`, start command: `celery -A app.celery_app.celery_app worker --loglevel=info`)
+   - `frontend` (root dir: `insightforge/frontend`)
+   - PostgreSQL
+   - Redis
+4. Set env vars for backend/worker/frontend according to `.env.example`.
+5. Public URL will be the Railway frontend domain generated after deploy.
+
 ### Railway
 1. Create a new project from GitHub repo.
 2. Add services for `backend`, `worker`, `frontend`, `postgres`, and `redis`.

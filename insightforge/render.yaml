@@ -1,0 +1,76 @@
+services:
+  - type: web
+    name: insightforge-backend
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: insightforge-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: insightforge-redis
+          property: connectionString
+      - key: REPORTS_DIR
+        value: reports
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: PARALLEL_API_KEY
+        sync: false
+
+  - type: worker
+    name: insightforge-worker
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    plan: starter
+    dockerCommand: celery -A app.celery_app.celery_app worker --loglevel=info
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: insightforge-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: insightforge-redis
+          property: connectionString
+      - key: REPORTS_DIR
+        value: reports
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: PARALLEL_API_KEY
+        sync: false
+
+  - type: web
+    name: insightforge-frontend
+    runtime: docker
+    dockerContext: ./frontend
+    dockerfilePath: ./frontend/Dockerfile
+    plan: starter
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://insightforge-backend.onrender.com
+
+  - type: redis
+    name: insightforge-redis
+    ipAllowList: []
+    plan: starter
+
+
+databases:
+  - name: insightforge-postgres
+    plan: starter
