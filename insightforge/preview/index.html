@@ -457,13 +457,21 @@
     async function requestWithFallback(path, options) {
       const bases = resolveApiBases();
       let lastErr = null;
+      let lastStatus = null;
       for (const base of bases) {
         try {
           const resp = await fetch(`${base}${path}`, options);
+          if (!resp.ok) {
+            lastStatus = resp.status;
+            continue;
+          }
           return { resp, base };
         } catch (err) {
           lastErr = err;
         }
+      }
+      if (lastStatus) {
+        throw new Error(`No reachable backend accepted request (last status ${lastStatus}).`);
       }
       throw lastErr || new Error("Unable to reach backend.");
     }
@@ -488,9 +496,6 @@
       });
       const createResp = createdReq.resp;
       const apiBase = createdReq.base;
-      if (!createResp.ok) {
-        throw new Error(`Create report failed (${createResp.status})`);
-      }
       const created = await createResp.json();
       const reportId = created.id;
 
