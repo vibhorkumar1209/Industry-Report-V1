@@ -125,14 +125,6 @@
           <input id="horizon" value="2024-2032" />
         </div>
         <div class="field">
-          <label for="base">Current Market Size (USD B)</label>
-          <input id="base" type="number" step="0.1" value="48" />
-        </div>
-        <div class="field">
-          <label for="cagr">Realistic CAGR (%)</label>
-          <input id="cagr" type="number" step="0.1" value="12.6" />
-        </div>
-        <div class="field">
           <label for="notes">Optional Strategic Notes</label>
           <textarea id="notes" placeholder="Add custom context, constraints, or angle."></textarea>
         </div>
@@ -226,6 +218,22 @@
       return years.map((year, i) => ({ year, value: +(base * Math.pow(1 + cagr / 100, i)).toFixed(2) }));
     }
 
+    function deriveModelInputs(industry, geo, horizon) {
+      const seed = hashSeed(industry + "|" + geo + "|" + horizon);
+      const region = regionOf(geo);
+      const regionFactor = {
+        "Global": 1.22,
+        "North America": 1.18,
+        "Europe": 1.08,
+        "Asia Pacific": 1.12,
+        "Latin America": 0.88,
+        "Middle East & Africa": 0.84
+      }[region] || 1.0;
+      const base = +(24 + seeded(seed + 5) * 78).toFixed(1) * regionFactor;
+      const cagr = +(6.2 + seeded(seed + 9) * 8.6).toFixed(1);
+      return { base: +base.toFixed(1), cagr };
+    }
+
     function scenarioAssumptions(type, region) {
       if (type === "Pessimistic") {
         return [
@@ -288,14 +296,17 @@
       const reportEl = document.getElementById("report");
       const seed = hashSeed(input.industry + input.geo + input.horizon);
       const region = regionOf(input.geo);
+      const modeled = deriveModelInputs(input.industry, input.geo, input.horizon);
+      const currentBase = modeled.base;
+      const realisticCagr = modeled.cagr;
       const { start, end } = yearsFromHorizon(input.horizon);
       const years = Array.from({ length: end - start + 1 }, (_, i) => start + i);
 
-      const realistic = forecastSeries(input.base, input.cagr, years);
-      const pessimisticCagr = +(Math.max(input.cagr - 3.8, 2.2)).toFixed(1);
-      const optimisticCagr = +(input.cagr + 3.6).toFixed(1);
-      const pessimistic = forecastSeries(input.base, pessimisticCagr, years);
-      const optimistic = forecastSeries(input.base, optimisticCagr, years);
+      const realistic = forecastSeries(currentBase, realisticCagr, years);
+      const pessimisticCagr = +(Math.max(realisticCagr - 3.8, 2.2)).toFixed(1);
+      const optimisticCagr = +(realisticCagr + 3.6).toFixed(1);
+      const pessimistic = forecastSeries(currentBase, pessimisticCagr, years);
+      const optimistic = forecastSeries(currentBase, optimisticCagr, years);
 
       const appBreak = normalizeShares([
         "Clinical Decision Support", "Workflow Automation", "Patient Engagement", "Risk & Compliance Analytics", "Revenue Cycle Intelligence"
@@ -345,7 +356,7 @@
 
       const scenarioRows = [
         { name: "Pessimistic", cagr: pessimisticCagr, value: pessEnd, assumptions: scenarioAssumptions("Pessimistic", region) },
-        { name: "Realistic", cagr: input.cagr, value: realEnd, assumptions: scenarioAssumptions("Realistic", region) },
+        { name: "Realistic", cagr: realisticCagr, value: realEnd, assumptions: scenarioAssumptions("Realistic", region) },
         { name: "Optimistic", cagr: optimisticCagr, value: optEnd, assumptions: scenarioAssumptions("Optimistic", region) }
       ];
 
@@ -364,8 +375,8 @@
         </section>
 
         <section class="grid g3">
-          <article class="card"><h3>Current Market Size</h3><div class="metric">USD ${fmt(input.base)}B</div><div class="small">Modeled current year baseline</div></article>
-          <article class="card"><h3>Realistic Growth Rate</h3><div class="metric">${fmt(input.cagr)}%</div><div class="small">Central CAGR assumption</div></article>
+          <article class="card"><h3>Current Market Size</h3><div class="metric">USD ${fmt(currentBase)}B</div><div class="small">Auto-modeled from industry + geography profile</div></article>
+          <article class="card"><h3>Realistic Growth Rate</h3><div class="metric">${fmt(realisticCagr)}%</div><div class="small">Auto-modeled central CAGR</div></article>
           <article class="card"><h3>Forecast (${endYear})</h3><div class="metric">USD ${fmt(realEnd)}B</div><div class="small">Realistic scenario endpoint</div></article>
         </section>
 
@@ -448,8 +459,6 @@
         industry: document.getElementById("industry").value.trim() || "Industry",
         geo: document.getElementById("geo").value,
         horizon: document.getElementById("horizon").value.trim() || "2024-2032",
-        base: parseFloat(document.getElementById("base").value || "40"),
-        cagr: parseFloat(document.getElementById("cagr").value || "10"),
         notes: document.getElementById("notes").value.trim()
       };
       renderReport(input);
@@ -459,8 +468,6 @@
       industry: "AI in Healthcare",
       geo: "Global",
       horizon: "2024-2032",
-      base: 48,
-      cagr: 12.6,
       notes: ""
     });
   </script>
