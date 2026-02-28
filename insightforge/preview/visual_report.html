@@ -3,123 +3,466 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>InsightForge AI - Visual Industry Report</title>
+  <title>InsightForge AI - Dynamic Industry Intelligence</title>
   <style>
-    :root { --bg:#f4f7fb; --card:#ffffff; --ink:#0f172a; --muted:#475569; --a:#0f766e; --b:#0369a1; --c:#1d4ed8; --d:#b45309; --e:#6d28d9; }
+    :root {
+      --bg: #eef4ff;
+      --surface: #ffffff;
+      --ink: #0b1324;
+      --muted: #425466;
+      --line: #d9e2ef;
+      --brand: #0b6bcb;
+      --brand2: #0f766e;
+      --warn: #b45309;
+      --bad: #b42318;
+      --good: #0a7d35;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: Arial, sans-serif; background: radial-gradient(circle at top right, #dbeafe 0%, #f8fafc 40%, #f1f5f9 100%); color:var(--ink); }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
-    .hero { background: linear-gradient(120deg,#0f172a,#0f766e); color:#fff; border-radius:16px; padding:20px; }
-    .hero h1 { margin:0; font-size: 28px; }
-    .hero p { margin:8px 0 0; color:#dbeafe; }
-    .grid { display:grid; gap:14px; margin-top:14px; }
-    .g3 { grid-template-columns: repeat(3,minmax(0,1fr)); }
-    .g2 { grid-template-columns: repeat(2,minmax(0,1fr)); }
-    .card { background: var(--card); border-radius: 14px; box-shadow: 0 8px 24px rgba(15,23,42,.08); padding:16px; }
-    h2 { margin:0 0 10px; font-size: 16px; }
-    .metric { font-size: 30px; font-weight: 700; }
-    .small { color: var(--muted); font-size: 13px; }
-    .bar { height: 10px; border-radius: 999px; background:#e2e8f0; overflow:hidden; margin-top:6px; }
-    .fill { height:100%; border-radius: 999px; }
-    .row { margin: 10px 0; }
-    ul { margin:8px 0 0 16px; color:#1e293b; }
-    table { width:100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border:1px solid #e2e8f0; padding:8px; text-align:left; }
-    th { background:#f8fafc; }
-    @media (max-width: 900px) { .g3,.g2 { grid-template-columns: 1fr; } }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: radial-gradient(circle at top left, #dbeafe, #f8fbff 45%, #edf2ff);
+      color: var(--ink);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+    .sidebar {
+      background: linear-gradient(165deg, #0b1324, #0b2844);
+      color: #f8fbff;
+      padding: 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+    .sidebar h1 { margin: 0; font-size: 20px; }
+    .sidebar p { margin: 8px 0 18px; color: #c8daef; font-size: 13px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 12px; margin-bottom: 6px; color: #cdddf2; }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      border: 1px solid #355172;
+      background: #0f3358;
+      color: #eff6ff;
+      border-radius: 8px;
+      padding: 9px;
+      font-size: 13px;
+    }
+    .field textarea { resize: vertical; min-height: 72px; }
+    .btn {
+      width: 100%;
+      border: none;
+      background: linear-gradient(100deg, #0b6bcb, #0f766e);
+      color: #fff;
+      border-radius: 10px;
+      padding: 11px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .main { padding: 20px; }
+    .hero {
+      background: linear-gradient(110deg, #0b6bcb, #0f766e);
+      color: #fff;
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .hero h2 { margin: 0; font-size: 28px; }
+    .hero p { margin: 8px 0 0; color: #eaf5ff; }
+    .grid { display: grid; gap: 14px; margin-top: 14px; }
+    .g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .g2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(11, 19, 36, .07);
+    }
+    .card h3 { margin: 0 0 10px; font-size: 15px; }
+    .metric { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+    .small { font-size: 12px; color: var(--muted); }
+    .bar-row { margin-bottom: 10px; }
+    .bar-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .bar-wrap { height: 10px; background: #eef3fa; border-radius: 999px; overflow: hidden; }
+    .bar { height: 100%; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #e5eaf2; padding: 7px; vertical-align: top; }
+    th { background: #f8fbff; text-align: left; }
+    ul { margin: 8px 0 0 16px; padding: 0; }
+    li { margin-bottom: 5px; }
+    .pill { display: inline-block; padding: 3px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .p-high { background: #ecfdf3; color: var(--good); }
+    .p-med { background: #fff7ed; color: var(--warn); }
+    .p-risk { background: #fef3f2; color: var(--bad); }
+    svg { width: 100%; height: auto; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .g3, .g2 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <section class="hero">
-      <h1>AI in Healthcare Industry Intelligence Report</h1>
-      <p>Global | 2024-2030 | Professional depth | Citation-backed analytical preview</p>
-    </section>
+  <div class="layout">
+    <aside class="sidebar">
+      <h1>InsightForge AI</h1>
+      <p>Dynamic Industry Intelligence Builder</p>
+      <form id="controls">
+        <div class="field">
+          <label for="industry">Industry</label>
+          <input id="industry" value="AI in Healthcare" />
+        </div>
+        <div class="field">
+          <label for="geo">Geo Focus</label>
+          <select id="geo"></select>
+        </div>
+        <div class="field">
+          <label for="horizon">Forecast Horizon</label>
+          <input id="horizon" value="2024-2032" />
+        </div>
+        <div class="field">
+          <label for="base">Current Market Size (USD B)</label>
+          <input id="base" type="number" step="0.1" value="48" />
+        </div>
+        <div class="field">
+          <label for="cagr">Realistic CAGR (%)</label>
+          <input id="cagr" type="number" step="0.1" value="12.6" />
+        </div>
+        <div class="field">
+          <label for="notes">Optional Strategic Notes</label>
+          <textarea id="notes" placeholder="Add custom context, constraints, or angle."></textarea>
+        </div>
+        <button class="btn" type="submit">Generate Dynamic Report</button>
+      </form>
+    </aside>
 
-    <section class="grid g3">
-      <div class="card"><h2>Current Market Size</h2><div class="metric">USD 45.0B</div><div class="small">Consensus estimate</div></div>
-      <div class="card"><h2>Growth Rate</h2><div class="metric">14.2% CAGR</div><div class="small">Base-case scenario</div></div>
-      <div class="card"><h2>Forecast 2031</h2><div class="metric">USD 87.4B</div><div class="small">5-year model output</div></div>
-    </section>
-
-    <section class="grid g2">
-      <div class="card">
-        <h2>Historical to Forecast Market Size</h2>
-        <svg viewBox="0 0 700 280" width="100%" role="img" aria-label="market trend">
-          <line x1="50" y1="240" x2="660" y2="240" stroke="#94a3b8"/>
-          <line x1="50" y1="30" x2="50" y2="240" stroke="#94a3b8"/>
-          <polyline fill="none" stroke="#0f766e" stroke-width="3" points="50,220 130,208 210,195 290,180 370,164 450,145 530,121 610,95"/>
-          <g fill="#0f766e">
-            <circle cx="50" cy="220" r="4"/><circle cx="130" cy="208" r="4"/><circle cx="210" cy="195" r="4"/>
-            <circle cx="290" cy="180" r="4"/><circle cx="370" cy="164" r="4"/><circle cx="450" cy="145" r="4"/>
-            <circle cx="530" cy="121" r="4"/><circle cx="610" cy="95" r="4"/>
-          </g>
-          <g font-size="11" fill="#334155">
-            <text x="50" y="260" text-anchor="middle">2024</text><text x="130" y="260" text-anchor="middle">2025</text>
-            <text x="210" y="260" text-anchor="middle">2026</text><text x="290" y="260" text-anchor="middle">2027</text>
-            <text x="370" y="260" text-anchor="middle">2028</text><text x="450" y="260" text-anchor="middle">2029</text>
-            <text x="530" y="260" text-anchor="middle">2030</text><text x="610" y="260" text-anchor="middle">2031</text>
-          </g>
-        </svg>
-      </div>
-      <div class="card">
-        <h2>Market Share by Key Players</h2>
-        <svg viewBox="0 0 300 220" width="100%" aria-label="donut chart">
-          <g transform="translate(150,110)">
-            <circle r="80" fill="none" stroke="#0f766e" stroke-width="30" stroke-dasharray="151 503" stroke-dashoffset="0"/>
-            <circle r="80" fill="none" stroke="#0369a1" stroke-width="30" stroke-dasharray="126 503" stroke-dashoffset="-151"/>
-            <circle r="80" fill="none" stroke="#1d4ed8" stroke-width="30" stroke-dasharray="95 503" stroke-dashoffset="-277"/>
-            <circle r="80" fill="none" stroke="#b45309" stroke-width="30" stroke-dasharray="75 503" stroke-dashoffset="-372"/>
-            <circle r="80" fill="none" stroke="#6d28d9" stroke-width="30" stroke-dasharray="56 503" stroke-dashoffset="-447"/>
-            <text y="4" text-anchor="middle" font-size="14" fill="#0f172a">Top 5</text>
-          </g>
-        </svg>
-        <div class="small">Microsoft 30% | Google 25% | AWS 19% | Oracle 15% | IBM 11%</div>
-      </div>
-    </section>
-
-    <section class="grid g2">
-      <div class="card">
-        <h2>Market Size Breakup by Type</h2>
-        <div class="row"><div class="small">Platform Software — 34%</div><div class="bar"><div class="fill" style="width:34%;background:var(--a)"></div></div></div>
-        <div class="row"><div class="small">Services — 28%</div><div class="bar"><div class="fill" style="width:28%;background:var(--b)"></div></div></div>
-        <div class="row"><div class="small">Infrastructure — 22%</div><div class="bar"><div class="fill" style="width:22%;background:var(--c)"></div></div></div>
-        <div class="row"><div class="small">Managed Solutions — 16%</div><div class="bar"><div class="fill" style="width:16%;background:var(--d)"></div></div></div>
-      </div>
-      <div class="card">
-        <h2>Regional / Country Overview</h2>
-        <table>
-          <thead><tr><th>Region</th><th>Share</th><th>Commentary</th></tr></thead>
-          <tbody>
-            <tr><td>North America</td><td>36%</td><td>Strong enterprise adoption and investment depth.</td></tr>
-            <tr><td>Europe</td><td>24%</td><td>Regulatory maturity and healthcare digitization programs.</td></tr>
-            <tr><td>Asia Pacific</td><td>27%</td><td>Fastest growth driven by infrastructure expansion.</td></tr>
-            <tr><td>Latin America</td><td>7%</td><td>Selective adoption in private provider networks.</td></tr>
-            <tr><td>Middle East & Africa</td><td>6%</td><td>Emerging demand with public-sector pilots.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="grid g3">
-      <div class="card"><h2>Market Trends</h2><ul><li>Clinical foundation models</li><li>Ambient documentation copilots</li><li>Outcome-focused analytics platforms</li></ul></div>
-      <div class="card"><h2>Market Drivers</h2><ul><li>Provider labor shortages</li><li>Need for faster clinical workflows</li><li>Digital modernization mandates</li></ul></div>
-      <div class="card"><h2>Barriers</h2><ul><li>Data governance complexity</li><li>Legacy integration friction</li><li>Liability and compliance concerns</li></ul></div>
-    </section>
-
-    <section class="grid g2">
-      <div class="card"><h2>Regulatory Overview</h2><ul><li>Tightening AI transparency obligations</li><li>Risk-classification and audit requirements</li><li>Sector-specific privacy controls for patient data</li></ul></div>
-      <div class="card"><h2>Key Player Profiles</h2><ul><li><b>Microsoft:</b> cloud + clinical AI ecosystem scale.</li><li><b>Google:</b> data platform leverage and model performance.</li><li><b>AWS:</b> infrastructure-first growth with partner channels.</li><li><b>Oracle:</b> healthcare workflow integration strength.</li><li><b>IBM:</b> enterprise AI + consulting-led implementations.</li></ul></div>
-    </section>
-
-    <section class="card" style="margin-top:14px;">
-      <h2>Citations</h2>
-      <ol>
-        <li><a href="https://www.iea.org/reports/electric-vehicle-outlook-2024">IEA</a></li>
-        <li><a href="https://www.worldbank.org/en/topic/industry">World Bank</a></li>
-        <li><a href="https://www.oecd.org/industry">OECD</a></li>
-      </ol>
-    </section>
+    <main class="main" id="report"></main>
   </div>
+
+  <script>
+    const GEO_DATA = {
+      "Global": [],
+      "North America": ["United States", "Canada", "Mexico", "Costa Rica", "Panama"],
+      "Europe": ["Germany", "United Kingdom", "France", "Italy", "Spain"],
+      "Asia Pacific": ["China", "India", "Japan", "South Korea", "Australia"],
+      "Latin America": ["Brazil", "Argentina", "Chile", "Colombia", "Peru"],
+      "Middle East & Africa": ["Saudi Arabia", "UAE", "South Africa", "Egypt", "Nigeria"]
+    };
+
+    const PALETTE = ["#0b6bcb", "#0f766e", "#9333ea", "#b45309", "#1d4ed8", "#db2777"];
+
+    function hashSeed(text) {
+      let h = 2166136261;
+      for (let i = 0; i < text.length; i++) {
+        h ^= text.charCodeAt(i);
+        h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+      }
+      return Math.abs(h >>> 0);
+    }
+
+    function seeded(seed) {
+      const x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+    }
+
+    function normalizeShares(items, seed) {
+      const raw = items.map((_, i) => 20 + Math.floor(seeded(seed + i * 17) * 60));
+      const sum = raw.reduce((a, b) => a + b, 0);
+      const shares = raw.map(v => Math.round((v / sum) * 100));
+      const drift = 100 - shares.reduce((a, b) => a + b, 0);
+      shares[0] += drift;
+      return items.map((label, idx) => ({ label, share: shares[idx] }));
+    }
+
+    function buildGeoOptions() {
+      const el = document.getElementById("geo");
+      el.innerHTML = "";
+
+      const globalOpt = document.createElement("option");
+      globalOpt.value = "Global";
+      globalOpt.textContent = "Global";
+      el.appendChild(globalOpt);
+
+      Object.keys(GEO_DATA).filter(r => r !== "Global").forEach(region => {
+        const regionOpt = document.createElement("option");
+        regionOpt.value = region;
+        regionOpt.textContent = region + " (Region)";
+        el.appendChild(regionOpt);
+
+        GEO_DATA[region].forEach(country => {
+          const cOpt = document.createElement("option");
+          cOpt.value = country;
+          cOpt.textContent = region + " - " + country;
+          el.appendChild(cOpt);
+        });
+      });
+      el.value = "Global";
+    }
+
+    function regionOf(geo) {
+      if (geo === "Global") return "Global";
+      if (GEO_DATA[geo]) return geo;
+      for (const [region, countries] of Object.entries(GEO_DATA)) {
+        if (countries.includes(geo)) return region;
+      }
+      return "Global";
+    }
+
+    function yearsFromHorizon(h) {
+      const m = h.match(/(\d{4})\D+(\d{4})/);
+      if (!m) return { start: 2024, end: 2032 };
+      const start = parseInt(m[1], 10);
+      const end = parseInt(m[2], 10);
+      return { start, end: Math.max(end, start + 3) };
+    }
+
+    function fmt(n) { return Number(n).toFixed(1); }
+
+    function forecastSeries(base, cagr, years) {
+      return years.map((year, i) => ({ year, value: +(base * Math.pow(1 + cagr / 100, i)).toFixed(2) }));
+    }
+
+    function scenarioAssumptions(type, region) {
+      if (type === "Pessimistic") {
+        return [
+          "Capital expenditure cycles remain delayed for 4-6 quarters.",
+          "Policy uncertainty increases compliance costs by ~2-3% of revenue.",
+          "Talent and data-integration bottlenecks limit scale deployment.",
+          "Competitive pricing pressure reduces margin-backed reinvestment."
+        ];
+      }
+      if (type === "Optimistic") {
+        return [
+          "Regulatory clarity and standards accelerate enterprise adoption.",
+          "Platform interoperability lowers time-to-value for deployments.",
+          "Public-private initiatives in " + region + " unlock new demand pools.",
+          "High-value use-cases demonstrate measurable ROI within 12 months."
+        ];
+      }
+      return [
+        "Macro conditions stabilize with moderate enterprise tech spending growth.",
+        "Adoption expands in priority verticals before broader rollout.",
+        "Vendors balance innovation with responsible governance compliance.",
+        "Channel partnerships improve distribution and implementation throughput."
+      ];
+    }
+
+    function svgLine(series) {
+      const width = 720, height = 290, pad = 40;
+      const vals = series.map(s => s.value);
+      const maxY = Math.max(...vals) * 1.08;
+      const minY = Math.min(...vals) * 0.92;
+      const span = Math.max(maxY - minY, 1);
+      const pts = series.map((d, i) => {
+        const x = pad + i * (width - 2 * pad) / Math.max(series.length - 1, 1);
+        const y = height - pad - ((d.value - minY) / span) * (height - 2 * pad);
+        return { x, y, year: d.year, value: d.value };
+      });
+      const poly = pts.map(p => `${p.x},${p.y}`).join(" ");
+      return `
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="market trend">
+        <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#a6b6ca"/>
+        <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#a6b6ca"/>
+        <polyline fill="none" stroke="#0b6bcb" stroke-width="3" points="${poly}"/>
+        ${pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3.8" fill="#0f766e"></circle><text x="${p.x}" y="${height - 12}" text-anchor="middle" font-size="10" fill="#334155">${p.year}</text>`).join("")}
+      </svg>`;
+    }
+
+    function donutSegments(shares) {
+      const radius = 78;
+      const circumference = 2 * Math.PI * radius;
+      let offset = 0;
+      return shares.map((s, i) => {
+        const arc = (s.share / 100) * circumference;
+        const seg = `<circle r="${radius}" fill="none" stroke="${PALETTE[i % PALETTE.length]}" stroke-width="30" stroke-dasharray="${arc} ${circumference}" stroke-dashoffset="-${offset}" />`;
+        offset += arc;
+        return seg;
+      }).join("");
+    }
+
+    function renderReport(input) {
+      const reportEl = document.getElementById("report");
+      const seed = hashSeed(input.industry + input.geo + input.horizon);
+      const region = regionOf(input.geo);
+      const { start, end } = yearsFromHorizon(input.horizon);
+      const years = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+
+      const realistic = forecastSeries(input.base, input.cagr, years);
+      const pessimisticCagr = +(Math.max(input.cagr - 3.8, 2.2)).toFixed(1);
+      const optimisticCagr = +(input.cagr + 3.6).toFixed(1);
+      const pessimistic = forecastSeries(input.base, pessimisticCagr, years);
+      const optimistic = forecastSeries(input.base, optimisticCagr, years);
+
+      const appBreak = normalizeShares([
+        "Clinical Decision Support", "Workflow Automation", "Patient Engagement", "Risk & Compliance Analytics", "Revenue Cycle Intelligence"
+      ], seed + 22);
+      const typeBreak = normalizeShares([
+        "Platform", "Services", "Infrastructure", "Managed Solutions"
+      ], seed + 44);
+      const endUseBreak = normalizeShares([
+        "Hospitals", "Payers", "Pharma", "Diagnostics", "Public Health"
+      ], seed + 66);
+      const categoryBreak = normalizeShares([
+        "Enterprise", "Mid-Market", "SMB", "Government"
+      ], seed + 88);
+      const playerShare = normalizeShares([
+        "Microsoft", "Google", "AWS", "Oracle", "IBM"
+      ], seed + 111);
+
+      const marketDynamics = [
+        {
+          trend: "AI copilots move from pilot to scaled deployment",
+          highlight: "Large providers standardize productivity use-cases",
+          impact: "High",
+          examples: "Ambient documentation, triage support, coding assistance"
+        },
+        {
+          trend: "Procurement shifts to ROI-linked contracts",
+          highlight: "Vendors required to prove outcomes in 6-12 months",
+          impact: "Medium",
+          examples: "Value-based pricing, milestone-based renewals"
+        },
+        {
+          trend: "Regulatory governance becomes a buying criterion",
+          highlight: "Auditability and explainability now mandatory",
+          impact: "High",
+          examples: "Model validation logs, bias monitoring, data residency"
+        }
+      ];
+
+      const regionalRows = region === "Global"
+        ? Object.keys(GEO_DATA).filter(r => r !== "Global").map((r, i) => ({ region: r, share: [33, 24, 27, 9, 7][i] || 5, note: "Demand depth driven by digital maturity and policy structure." }))
+        : (GEO_DATA[region] || [region]).slice(0, 5).map((c, i) => ({ region: c, share: [34, 23, 19, 14, 10][i] || 8, note: "Market growth linked to provider transformation and data infrastructure." }));
+
+      const endYear = years[years.length - 1];
+      const pessEnd = pessimistic[pessimistic.length - 1].value;
+      const realEnd = realistic[realistic.length - 1].value;
+      const optEnd = optimistic[optimistic.length - 1].value;
+
+      const scenarioRows = [
+        { name: "Pessimistic", cagr: pessimisticCagr, value: pessEnd, assumptions: scenarioAssumptions("Pessimistic", region) },
+        { name: "Realistic", cagr: input.cagr, value: realEnd, assumptions: scenarioAssumptions("Realistic", region) },
+        { name: "Optimistic", cagr: optimisticCagr, value: optEnd, assumptions: scenarioAssumptions("Optimistic", region) }
+      ];
+
+      const list = arr => `<ul>${arr.map(x => `<li>${x}</li>`).join("")}</ul>`;
+      const bars = (arr) => arr.map((x, i) => `
+        <div class="bar-row">
+          <div class="bar-meta"><span>${x.label}</span><span>${x.share}%</span></div>
+          <div class="bar-wrap"><div class="bar" style="width:${x.share}%;background:${PALETTE[i % PALETTE.length]}"></div></div>
+        </div>`).join("");
+
+      reportEl.innerHTML = `
+        <section class="hero">
+          <h2>${input.industry} Industry Intelligence</h2>
+          <p>${input.geo} | Forecast Horizon ${input.horizon} | Dynamic Analytical View</p>
+          ${input.notes ? `<p><b>Custom angle:</b> ${input.notes}</p>` : ""}
+        </section>
+
+        <section class="grid g3">
+          <article class="card"><h3>Current Market Size</h3><div class="metric">USD ${fmt(input.base)}B</div><div class="small">Modeled current year baseline</div></article>
+          <article class="card"><h3>Realistic Growth Rate</h3><div class="metric">${fmt(input.cagr)}%</div><div class="small">Central CAGR assumption</div></article>
+          <article class="card"><h3>Forecast (${endYear})</h3><div class="metric">USD ${fmt(realEnd)}B</div><div class="small">Realistic scenario endpoint</div></article>
+        </section>
+
+        <section class="grid g2">
+          <article class="card">
+            <h3>Historical to Forecast Market Size (Realistic)</h3>
+            ${svgLine(realistic)}
+          </article>
+          <article class="card">
+            <h3>Market Share by Key Players</h3>
+            <svg viewBox="0 0 300 220" aria-label="market share donut">
+              <g transform="translate(150,110)">
+                ${donutSegments(playerShare)}
+                <text y="4" text-anchor="middle" font-size="13" fill="#0b1324">Top 5 Players</text>
+              </g>
+            </svg>
+            ${bars(playerShare)}
+          </article>
+        </section>
+
+        <section class="grid g2">
+          <article class="card"><h3>Market Breakdown by Application</h3>${bars(appBreak)}</article>
+          <article class="card"><h3>Market Breakdown by Type</h3>${bars(typeBreak)}</article>
+        </section>
+
+        <section class="grid g2">
+          <article class="card"><h3>Market Breakdown by End-Use</h3>${bars(endUseBreak)}</article>
+          <article class="card"><h3>Market Breakdown by Category</h3>${bars(categoryBreak)}</article>
+        </section>
+
+        <section class="grid g2">
+          <article class="card">
+            <h3>Market Dynamics (Detailed)</h3>
+            <table>
+              <thead><tr><th>Trend</th><th>Highlight</th><th>Impact</th><th>Examples</th></tr></thead>
+              <tbody>
+                ${marketDynamics.map(d => `<tr><td>${d.trend}</td><td>${d.highlight}</td><td><span class="pill ${d.impact === "High" ? "p-high" : "p-med"}">${d.impact}</span></td><td>${d.examples}</td></tr>`).join("")}
+              </tbody>
+            </table>
+          </article>
+          <article class="card">
+            <h3>Regional / Country Overview</h3>
+            <table>
+              <thead><tr><th>${region === "Global" ? "Region" : "Country"}</th><th>Share</th><th>Insight</th></tr></thead>
+              <tbody>
+                ${regionalRows.map(r => `<tr><td>${r.region}</td><td>${r.share}%</td><td>${r.note}</td></tr>`).join("")}
+              </tbody>
+            </table>
+          </article>
+        </section>
+
+        <section class="grid g2">
+          ${scenarioRows.map(s => `
+            <article class="card">
+              <h3>${s.name} Scenario</h3>
+              <div class="metric">USD ${fmt(s.value)}B</div>
+              <div class="small">${endYear} value | CAGR ${fmt(s.cagr)}%</div>
+              <h3 style="margin-top:12px">Detailed Assumptions</h3>
+              ${list(s.assumptions)}
+            </article>
+          `).join("")}
+        </section>
+
+        <section class="card">
+          <h3>Regulatory and Strategic Implications</h3>
+          <ul>
+            <li><b>Compliance burden:</b> Vendors with auditable AI governance and clear model lifecycle controls are likely to win enterprise deals faster.</li>
+            <li><b>Localization pressure:</b> ${region} buyers increasingly prioritize local data-hosting, sovereign controls, and jurisdiction-ready compliance templates.</li>
+            <li><b>Execution gap:</b> Winners will combine domain-specific applications with strong integration services and measurable business outcomes.</li>
+          </ul>
+        </section>
+      `;
+    }
+
+    buildGeoOptions();
+    const form = document.getElementById("controls");
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = {
+        industry: document.getElementById("industry").value.trim() || "Industry",
+        geo: document.getElementById("geo").value,
+        horizon: document.getElementById("horizon").value.trim() || "2024-2032",
+        base: parseFloat(document.getElementById("base").value || "40"),
+        cagr: parseFloat(document.getElementById("cagr").value || "10"),
+        notes: document.getElementById("notes").value.trim()
+      };
+      renderReport(input);
+    });
+
+    renderReport({
+      industry: "AI in Healthcare",
+      geo: "Global",
+      horizon: "2024-2032",
+      base: 48,
+      cagr: 12.6,
+      notes: ""
+    });
+  </script>
 </body>
 </html>
