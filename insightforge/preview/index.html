@@ -125,10 +125,23 @@
           <input id="horizon" value="2024-2032" />
         </div>
         <div class="field">
+          <label for="depth">Depth</label>
+          <select id="depth">
+            <option>Basic</option>
+            <option selected>Professional</option>
+            <option>Investor-grade</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="apiBase">Backend API Base URL</label>
+          <input id="apiBase" value="http://localhost:8000" />
+        </div>
+        <div class="field">
           <label for="notes">Optional Strategic Notes</label>
           <textarea id="notes" placeholder="Add custom context, constraints, or angle."></textarea>
         </div>
         <button class="btn" type="submit">Generate Dynamic Report</button>
+        <p id="statusText" class="small" style="color:#cdddf2; margin-top:10px;"></p>
       </form>
     </aside>
 
@@ -214,26 +227,6 @@
 
     function fmt(n) { return Number(n).toFixed(1); }
 
-    function forecastSeries(base, cagr, years) {
-      return years.map((year, i) => ({ year, value: +(base * Math.pow(1 + cagr / 100, i)).toFixed(2) }));
-    }
-
-    function deriveModelInputs(industry, geo, horizon) {
-      const seed = hashSeed(industry + "|" + geo + "|" + horizon);
-      const region = regionOf(geo);
-      const regionFactor = {
-        "Global": 1.22,
-        "North America": 1.18,
-        "Europe": 1.08,
-        "Asia Pacific": 1.12,
-        "Latin America": 0.88,
-        "Middle East & Africa": 0.84
-      }[region] || 1.0;
-      const base = +(24 + seeded(seed + 5) * 78).toFixed(1) * regionFactor;
-      const cagr = +(6.2 + seeded(seed + 9) * 8.6).toFixed(1);
-      return { base: +base.toFixed(1), cagr };
-    }
-
     function scenarioAssumptions(type, region) {
       if (type === "Pessimistic") {
         return [
@@ -292,62 +285,64 @@
       }).join("");
     }
 
-    function renderReport(input) {
+    function renderReport(input, livePayload) {
       const reportEl = document.getElementById("report");
       const seed = hashSeed(input.industry + input.geo + input.horizon);
       const region = regionOf(input.geo);
-      const modeled = deriveModelInputs(input.industry, input.geo, input.horizon);
-      const currentBase = modeled.base;
-      const realisticCagr = modeled.cagr;
+      const visuals = livePayload.visuals || {};
+      const currentBase = Number(visuals.current_market_size_usd_billion || 0);
+      const realisticCagr = Number(visuals.cagr_percent || 0);
       const { start, end } = yearsFromHorizon(input.horizon);
       const years = Array.from({ length: end - start + 1 }, (_, i) => start + i);
 
-      const realistic = forecastSeries(currentBase, realisticCagr, years);
+      const realistic = (visuals.forecast_table || []).map((r) => ({ year: Number(r.year), value: Number(r.market_size_usd_billion) }));
       const pessimisticCagr = +(Math.max(realisticCagr - 3.8, 2.2)).toFixed(1);
       const optimisticCagr = +(realisticCagr + 3.6).toFixed(1);
+      const forecastSeries = (base, cagr, yearList) => yearList.map((year, i) => ({ year, value: +(base * Math.pow(1 + cagr / 100, i)).toFixed(2) }));
       const pessimistic = forecastSeries(currentBase, pessimisticCagr, years);
       const optimistic = forecastSeries(currentBase, optimisticCagr, years);
 
-      const appBreak = normalizeShares([
+      const normalizeLiveShares = (rows) =>
+        (rows || []).map((x) => ({ label: x.label || x.region || "Segment", share: Number(x.share_percent || x.share || 0) }));
+
+      const appBreak = normalizeLiveShares(visuals.application_breakup || normalizeShares([
         "Clinical Decision Support", "Workflow Automation", "Patient Engagement", "Risk & Compliance Analytics", "Revenue Cycle Intelligence"
-      ], seed + 22);
-      const typeBreak = normalizeShares([
-        "Platform", "Services", "Infrastructure", "Managed Solutions"
-      ], seed + 44);
-      const endUseBreak = normalizeShares([
+      ], seed + 22));
+      const typeBreak = normalizeLiveShares(visuals.type_breakup || []);
+      const endUseBreak = normalizeLiveShares(visuals.end_use_breakup || normalizeShares([
         "Hospitals", "Payers", "Pharma", "Diagnostics", "Public Health"
-      ], seed + 66);
-      const categoryBreak = normalizeShares([
+      ], seed + 66));
+      const categoryBreak = normalizeLiveShares(visuals.category_breakup || normalizeShares([
         "Enterprise", "Mid-Market", "SMB", "Government"
-      ], seed + 88);
-      const playerShare = normalizeShares([
-        "Microsoft", "Google", "AWS", "Oracle", "IBM"
-      ], seed + 111);
+      ], seed + 88));
+      const playerShare = normalizeLiveShares(visuals.player_market_share || []);
 
-      const marketDynamics = [
-        {
-          trend: "AI copilots move from pilot to scaled deployment",
-          highlight: "Large providers standardize productivity use-cases",
-          impact: "High",
-          examples: "Ambient documentation, triage support, coding assistance"
-        },
-        {
-          trend: "Procurement shifts to ROI-linked contracts",
-          highlight: "Vendors required to prove outcomes in 6-12 months",
-          impact: "Medium",
-          examples: "Value-based pricing, milestone-based renewals"
-        },
-        {
-          trend: "Regulatory governance becomes a buying criterion",
-          highlight: "Auditability and explainability now mandatory",
-          impact: "High",
-          examples: "Model validation logs, bias monitoring, data residency"
-        }
-      ];
+      const trendItems = (visuals.market_dynamics && visuals.market_dynamics.trends) || [];
+      const driverItems = (visuals.market_dynamics && visuals.market_dynamics.drivers) || [];
+      const barrierItems = (visuals.market_dynamics && visuals.market_dynamics.barriers) || [];
+      const marketDynamics = [];
+      const maxRows = Math.max(trendItems.length, 3);
+      for (let i = 0; i < maxRows; i++) {
+        const t = trendItems[i] || `Emerging trend ${i + 1} identified from source synthesis`;
+        const d = driverItems[i] || "Demand-side momentum and enterprise investment support";
+        const b = barrierItems[i] || "Execution complexity remains a limiting factor";
+        marketDynamics.push({
+          trend: t,
+          highlight: d,
+          impact: i === 0 ? "High" : "Medium",
+          examples: b,
+        });
+      }
 
-      const regionalRows = region === "Global"
-        ? Object.keys(GEO_DATA).filter(r => r !== "Global").map((r, i) => ({ region: r, share: [33, 24, 27, 9, 7][i] || 5, note: "Demand depth driven by digital maturity and policy structure." }))
-        : (GEO_DATA[region] || [region]).slice(0, 5).map((c, i) => ({ region: c, share: [34, 23, 19, 14, 10][i] || 8, note: "Market growth linked to provider transformation and data infrastructure." }));
+      const regionalRows = (visuals.regional_overview || []).length
+        ? visuals.regional_overview.map((r) => ({
+            region: r.region,
+            share: Number(r.share_percent || 0),
+            note: r.summary || "Market growth linked to provider transformation and data infrastructure.",
+          }))
+        : (region === "Global"
+          ? Object.keys(GEO_DATA).filter(r => r !== "Global").map((r, i) => ({ region: r, share: [33, 24, 27, 9, 7][i] || 5, note: "Demand depth driven by digital maturity and policy structure." }))
+          : (GEO_DATA[region] || [region]).slice(0, 5).map((c, i) => ({ region: c, share: [34, 23, 19, 14, 10][i] || 8, note: "Market growth linked to provider transformation and data infrastructure." })));
 
       const endYear = years[years.length - 1];
       const pessEnd = pessimistic[pessimistic.length - 1].value;
@@ -370,7 +365,7 @@
       reportEl.innerHTML = `
         <section class="hero">
           <h2>${input.industry} Industry Intelligence</h2>
-          <p>${input.geo} | Forecast Horizon ${input.horizon} | Dynamic Analytical View</p>
+          <p>${input.geo} | Forecast Horizon ${input.horizon} | Live API Analytical View</p>
           ${input.notes ? `<p><b>Custom angle:</b> ${input.notes}</p>` : ""}
         </section>
 
@@ -453,23 +448,76 @@
 
     buildGeoOptions();
     const form = document.getElementById("controls");
-    form.addEventListener("submit", (e) => {
+    async function createAndFetchLiveReport(input) {
+      const apiBase = (document.getElementById("apiBase").value || "http://localhost:8000").trim().replace(/\/$/, "");
+      const statusText = document.getElementById("statusText");
+      statusText.textContent = "Submitting report request...";
+
+      const payload = {
+        industry: input.notes ? `${input.industry} (${input.notes})` : input.industry,
+        geography: input.geo,
+        time_horizon: input.horizon,
+        depth: input.depth,
+        include_financial_forecast: true,
+        include_competitive_landscape: true
+      };
+
+      const createResp = await fetch(`${apiBase}/api/reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!createResp.ok) {
+        throw new Error(`Create report failed (${createResp.status})`);
+      }
+      const created = await createResp.json();
+      const reportId = created.id;
+
+      for (let attempt = 0; attempt < 180; attempt++) {
+        const statusResp = await fetch(`${apiBase}/api/reports/${reportId}/status`);
+        if (!statusResp.ok) throw new Error(`Status check failed (${statusResp.status})`);
+        const status = await statusResp.json();
+        statusText.textContent = `Status: ${status.status} - ${status.message || ""}`;
+
+        if (status.status === "Complete") {
+          const reportResp = await fetch(`${apiBase}/api/reports/${reportId}`);
+          if (!reportResp.ok) throw new Error(`Fetch report failed (${reportResp.status})`);
+          return await reportResp.json();
+        }
+        if (status.status === "Failed") {
+          throw new Error(status.message || "Report generation failed.");
+        }
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+      throw new Error("Timed out waiting for report completion.");
+    }
+
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const input = {
         industry: document.getElementById("industry").value.trim() || "Industry",
         geo: document.getElementById("geo").value,
         horizon: document.getElementById("horizon").value.trim() || "2024-2032",
+        depth: document.getElementById("depth").value,
         notes: document.getElementById("notes").value.trim()
       };
-      renderReport(input);
+      try {
+        const liveReport = await createAndFetchLiveReport(input);
+        const visuals = (liveReport.metadata_json && liveReport.metadata_json.visuals) || {};
+        renderReport(input, { visuals });
+      } catch (err) {
+        const msg = err && err.message ? err.message : "Unable to fetch live report.";
+        document.getElementById("statusText").textContent = `Error: ${msg}`;
+      }
     });
 
     renderReport({
       industry: "AI in Healthcare",
       geo: "Global",
       horizon: "2024-2032",
+      depth: "Professional",
       notes: ""
-    });
+    }, { visuals: {} });
   </script>
 </body>
 </html>
