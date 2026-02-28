@@ -133,10 +133,6 @@
           </select>
         </div>
         <div class="field">
-          <label for="apiBase">Backend API Base URL</label>
-          <input id="apiBase" value="http://localhost:8000" />
-        </div>
-        <div class="field">
           <label for="notes">Optional Strategic Notes</label>
           <textarea id="notes" placeholder="Add custom context, constraints, or angle."></textarea>
         </div>
@@ -448,8 +444,31 @@
 
     buildGeoOptions();
     const form = document.getElementById("controls");
+    function resolveApiBases() {
+      const out = [];
+      if (window.location.protocol.startsWith("http")) {
+        out.push(window.location.origin);
+      }
+      out.push("http://127.0.0.1:8000");
+      out.push("http://localhost:8000");
+      return [...new Set(out)];
+    }
+
+    async function requestWithFallback(path, options) {
+      const bases = resolveApiBases();
+      let lastErr = null;
+      for (const base of bases) {
+        try {
+          const resp = await fetch(`${base}${path}`, options);
+          return { resp, base };
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+      throw lastErr || new Error("Unable to reach backend.");
+    }
+
     async function createAndFetchLiveReport(input) {
-      const apiBase = (document.getElementById("apiBase").value || "http://localhost:8000").trim().replace(/\/$/, "");
       const statusText = document.getElementById("statusText");
       statusText.textContent = "Submitting report request...";
 
@@ -462,11 +481,13 @@
         include_competitive_landscape: true
       };
 
-      const createResp = await fetch(`${apiBase}/api/reports`, {
+      const createdReq = await requestWithFallback("/api/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+      const createResp = createdReq.resp;
+      const apiBase = createdReq.base;
       if (!createResp.ok) {
         throw new Error(`Create report failed (${createResp.status})`);
       }
