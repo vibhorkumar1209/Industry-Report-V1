@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+.next/
+
+# Env
+.env
+
+# Build/output
+backend/reports/*.pdf
+backend/reports/*.html
+backend/reports/*.md
+
+# OS
+.DS_Store
