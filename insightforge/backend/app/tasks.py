@@ -25,8 +25,16 @@ def _set_report_status(db, report: Report, status: str, message: str) -> None:
     db.commit()
 
 
+def run_report_pipeline(report_id: int) -> None:
+    _generate_report_impl(report_id)
+
+
 @celery_app.task(name="app.tasks.generate_report_task")
 def generate_report_task(report_id: int) -> None:
+    _generate_report_impl(report_id)
+
+
+def _generate_report_impl(report_id: int) -> None:
     db = SessionLocal()
     try:
         report = db.get(Report, report_id)

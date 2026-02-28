@@ -9,8 +9,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     parallel_api_key: str = ""
 
-    database_url: str = "postgresql://insightforge:insightforge@postgres:5432/insightforge"
+    database_url: str = "sqlite:///./insightforge.db"
     redis_url: str = "redis://redis:6379/0"
+    sync_tasks: bool = True
 
     reports_dir: str = "reports"
     max_sources: int = 20

@@ -1,21 +1,36 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models import Report
 from app.schemas.report import ReportCreate, ReportSectionRegenerate
-from app.tasks import generate_report_task
+from app.tasks import generate_report_task, run_report_pipeline
 
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
 
+def enqueue_report_generation(report_id: int, background_tasks: BackgroundTasks | None = None) -> None:
+    if settings.sync_tasks:
+        if background_tasks is not None:
+            background_tasks.add_task(run_report_pipeline, report_id)
+        else:
+            run_report_pipeline(report_id)
+        return
+    generate_report_task.delay(report_id)
+
+
 @router.post("/reports")
-def create_report(payload: ReportCreate, db: Session = Depends(get_db)):
+def create_report(
+    payload: ReportCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     report = Report(
         industry=payload.industry,
         geography=payload.geography,
@@ -30,7 +45,7 @@ def create_report(payload: ReportCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(report)
 
-    generate_report_task.delay(report.id)
+    enqueue_report_generation(report.id, background_tasks)
     return {"id": report.id, "status": report.status}
 
 
@@ -70,7 +85,12 @@ def download_report_pdf(report_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/reports/{report_id}/regenerate-section")
-def regenerate_section(report_id: int, payload: ReportSectionRegenerate, db: Session = Depends(get_db)):
+def regenerate_section(
+    report_id: int,
+    payload: ReportSectionRegenerate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     report = db.get(Report, report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -80,5 +100,5 @@ def regenerate_section(report_id: int, payload: ReportSectionRegenerate, db: Ses
     db.add(report)
     db.commit()
 
-    generate_report_task.delay(report.id)
+    enqueue_report_generation(report.id, background_tasks)
     return {"id": report.id, "status": report.status, "message": report.progress_message}

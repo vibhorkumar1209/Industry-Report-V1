@@ -24,6 +24,7 @@ services:
       DATABASE_URL: postgresql://insightforge:insightforge@postgres:5432/insightforge
       REDIS_URL: redis://redis:6379/0
       REPORTS_DIR: /app/reports
+      SYNC_TASKS: "false"
     volumes:
       - ./backend/reports:/app/reports
     ports:
@@ -41,6 +42,7 @@ services:
       DATABASE_URL: postgresql://insightforge:insightforge@postgres:5432/insightforge
       REDIS_URL: redis://redis:6379/0
       REPORTS_DIR: /app/reports
+      SYNC_TASKS: "false"
     command: celery -A app.celery_app.celery_app worker --loglevel=info
     volumes:
       - ./backend/reports:/app/reports

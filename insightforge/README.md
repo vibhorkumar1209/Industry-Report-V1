@@ -11,7 +11,9 @@ InsightForge AI is a production-ready MVP SaaS for generating structured, citati
   - Depth (`Basic`, `Professional`, `Investor-grade`)
   - Include Financial Forecast
   - Include Competitive Landscape
-- Async report generation pipeline using Celery + Redis
+- Async report generation pipeline:
+  - Local mode: FastAPI BackgroundTasks (no Celery worker required)
+  - Docker/production mode: Celery + Redis
 - Multi-agent orchestration (Research, Scraper, Analysis, Cross-Validation, Financial Model, Report Composer)
 - Structured outputs:
   - Executive Summary
@@ -41,7 +43,7 @@ InsightForge AI is a production-ready MVP SaaS for generating structured, citati
 ```
 
 ## Tech Stack
-- Backend: FastAPI, SQLAlchemy, PostgreSQL, Celery, Redis, OpenAI SDK, Anthropic SDK, Requests, BeautifulSoup, WeasyPrint
+- Backend: FastAPI, SQLAlchemy, SQLite/PostgreSQL, Celery (optional in local mode), Redis, OpenAI SDK, Anthropic SDK, Requests, BeautifulSoup, WeasyPrint
 - Frontend: Next.js, Tailwind CSS, Axios
 - Infra: Docker Compose
 
@@ -57,12 +59,16 @@ Required:
 Also used:
 - `REDIS_URL`
 - `REPORTS_DIR`
+- `SYNC_TASKS`
 - `NEXT_PUBLIC_API_BASE_URL`
 
 If `PARALLEL_API_KEY` is empty, the platform uses mock research sources.
 If `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` are empty, deterministic local extraction/composition fallbacks are used.
 
 ## Local Setup (Without Docker)
+Local mode defaults:
+- `DATABASE_URL=sqlite:///./insightforge.db`
+- `SYNC_TASKS=true` (no Celery worker needed)
 
 ### Backend
 ```bash
@@ -71,13 +77,6 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-In another terminal:
-```bash
-cd backend
-source .venv/bin/activate
-celery -A app.celery_app.celery_app worker --loglevel=info
 ```
 
 ### Frontend
@@ -95,6 +94,8 @@ App URL: `http://localhost:3000`
 cp .env.example .env
 docker compose up --build
 ```
+
+Docker mode sets `SYNC_TASKS=false` and runs Celery worker + Redis.
 
 Services:
 - Frontend: `http://localhost:3000`
