@@ -116,7 +116,7 @@ def generate_report_task(report_id: int) -> None:
             for s in persisted_sources
         ]
 
-        markdown_report = composer_agent.run(
+        compose_result = composer_agent.run(
             report_input={
                 "industry": report.industry,
                 "geography": report.geography,
@@ -130,6 +130,8 @@ def generate_report_task(report_id: int) -> None:
             consensus=consensus,
             forecast=forecast,
         )
+        markdown_report = compose_result["markdown"]
+        visuals_payload = compose_result["visuals"]
 
         html_report = markdown_to_html(markdown_report)
 
@@ -161,6 +163,7 @@ def generate_report_task(report_id: int) -> None:
             "consensus": consensus,
             "forecast": forecast,
             "source_count": len(persisted_sources),
+            "visuals": visuals_payload,
         }
         _set_report_status(db, report, "Complete", "Report generated successfully")
 
