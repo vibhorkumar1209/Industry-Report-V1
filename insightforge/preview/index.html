@@ -241,46 +241,22 @@
     function makeSyntheticVisuals(input) {
       const seed = hashSeed(input.industry + input.geo + input.horizon);
       const model = deriveModelInputs(input.industry, input.geo, input.horizon);
-      const industryKey = input.industry.toLowerCase();
-      const companyUniverse = (() => {
-        if (industryKey.includes("health") || industryKey.includes("pharma") || industryKey.includes("med")) {
-          return ["UnitedHealth", "Roche", "Pfizer", "Medtronic", "Siemens Healthineers"];
-        }
-        if (industryKey.includes("energy") || industryKey.includes("oil") || industryKey.includes("utility")) {
-          return ["Shell", "ExxonMobil", "Chevron", "BP", "TotalEnergies"];
-        }
-        if (industryKey.includes("fin") || industryKey.includes("bank") || industryKey.includes("insur")) {
-          return ["JPMorgan", "Bank of America", "HSBC", "Goldman Sachs", "Citigroup"];
-        }
-        if (industryKey.includes("auto") || industryKey.includes("vehicle")) {
-          return ["Toyota", "Volkswagen", "Tesla", "BYD", "Hyundai"];
-        }
-        return ["Microsoft", "Google", "AWS", "Oracle", "IBM"];
-      })();
-      const segmentUniverse = (() => {
-        if (industryKey.includes("health") || industryKey.includes("pharma") || industryKey.includes("med")) {
-          return {
-            application: ["Clinical Decision Support", "Workflow Automation", "Patient Engagement", "Imaging Analytics", "Revenue Cycle"],
-            type: ["Platform Software", "Implementation Services", "Data Infrastructure", "Managed Solutions"],
-            endUse: ["Hospitals", "Payers", "Pharma/Biotech", "Diagnostics", "Public Health"],
-            category: ["Enterprise", "Mid-Market", "SMB", "Government/Nonprofit"],
-          };
-        }
-        if (industryKey.includes("energy") || industryKey.includes("oil") || industryKey.includes("utility")) {
-          return {
-            application: ["Grid Optimization", "Demand Forecasting", "Asset Monitoring", "Trading Analytics", "Customer Platforms"],
-            type: ["Software", "Field Services", "Hardware/IoT", "Managed Operations"],
-            endUse: ["Utilities", "Industrial", "Commercial", "Residential", "Government"],
-            category: ["Regulated", "Liberalized", "Distributed", "Emerging Markets"],
-          };
-        }
-        return {
-          application: ["Core Operations", "Customer Experience", "Supply Chain", "Risk & Compliance", "Decision Intelligence"],
-          type: ["Platform", "Services", "Infrastructure", "Managed Solutions"],
-          endUse: ["Large Enterprise", "Mid-Market", "SMB", "Public Sector", "Channel Partners"],
-          category: ["Premium", "Mainstream", "Value", "Emerging"],
-        };
-      })();
+      const tokens = input.industry.split(/\s+/).map(t => t.trim()).filter(Boolean);
+      const anchor = tokens[0] || "Industry";
+      const geoShort = input.geo.replace(" (Region)", "");
+      const companyPool = [
+        `${anchor}Nova`, `${anchor}Axis`, `${anchor}Grid`, `${anchor}Logic`, `${anchor}Bridge`,
+        `${anchor}Prime`, `${anchor}Works`, `${anchor}Dynamics`, `${anchor}Core`, `${anchor}Cloud`,
+        `${geoShort} Ventures`, `${geoShort} Systems`, `${geoShort} Analytics`, `${geoShort} Labs`
+      ];
+      const rotatedCompanies = companyPool.slice(seed % companyPool.length).concat(companyPool.slice(0, seed % companyPool.length));
+      const companyUniverse = rotatedCompanies.slice(0, 5);
+      const segmentUniverse = {
+        application: [`${anchor} Operations`, `${anchor} Intelligence`, `${anchor} Automation`, `${anchor} Experience`, `${anchor} Risk Controls`],
+        type: [`${anchor} Platforms`, `${anchor} Services`, `${anchor} Infrastructure`, `${anchor} Managed Solutions`],
+        endUse: [`${geoShort} Enterprises`, `${geoShort} Mid-Market`, `${geoShort} SMB`, `${geoShort} Public Sector`, `${geoShort} Channel`],
+        category: [`${anchor} Premium`, `${anchor} Core`, `${anchor} Value`, `${anchor} Emerging`],
+      };
       const yearsCfg = yearsFromHorizon(input.horizon);
       const years = Array.from({ length: yearsCfg.end - yearsCfg.start + 1 }, (_, i) => yearsCfg.start + i);
       const forecast = years.map((year, i) => ({
@@ -300,6 +276,7 @@
           }));
 
       return {
+        input_fingerprint: `${input.industry} | ${input.geo} | ${input.horizon}`,
         current_market_size_usd_billion: model.base,
         cagr_percent: model.cagr,
         forecast_table: forecast,
@@ -459,6 +436,7 @@
           <h2>${input.industry} Industry Intelligence</h2>
           <p>${input.geo} | Forecast Horizon ${input.horizon} | Live API Analytical View</p>
           <p><span class="pill ${hasLiveVisuals ? "p-high" : "p-med"}">${modeLabel}</span></p>
+          <p class="small" style="color:#eaf5ff;">Input Fingerprint: ${visuals.input_fingerprint || (input.industry + " | " + input.geo + " | " + input.horizon)}</p>
           ${input.notes ? `<p><b>Custom angle:</b> ${input.notes}</p>` : ""}
         </section>
 
