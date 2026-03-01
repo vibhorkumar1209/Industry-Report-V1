@@ -7,7 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.market_intel.contracts import ExecutionMode, ResearchScope
+from app.market_intel.orchestrator import MultiAgentMarketIntelOrchestrator
 from app.models import Report
+from app.schemas.market_intel import MarketIntelComposeRequest, MarketIntelRunRequest, MarketIntelScopeInput
 from app.schemas.report import ReportCreate, ReportSectionRegenerate
 from app.tasks import generate_report_task, run_report_pipeline
 
@@ -102,3 +105,42 @@ def regenerate_section(
 
     enqueue_report_generation(report.id, background_tasks)
     return {"id": report.id, "status": report.status, "message": report.progress_message}
+
+
+@router.post("/market-intel/prepare")
+def prepare_market_intel(payload: MarketIntelScopeInput):
+    scope = ResearchScope(
+        industry=payload.industry,
+        geography=payload.geography,
+        start_year=payload.start_year,
+        end_year=payload.end_year,
+        currency=payload.currency,
+    )
+    orchestrator = MultiAgentMarketIntelOrchestrator(scope)
+    return orchestrator.prepare()
+
+
+@router.post("/market-intel/run")
+def run_market_intel(payload: MarketIntelRunRequest):
+    scope = ResearchScope(
+        industry=payload.industry,
+        geography=payload.geography,
+        start_year=payload.start_year,
+        end_year=payload.end_year,
+        currency=payload.currency,
+    )
+    orchestrator = MultiAgentMarketIntelOrchestrator(scope)
+    return orchestrator.run(ExecutionMode(payload.execution_mode))
+
+
+@router.post("/market-intel/compose")
+def compose_market_intel(payload: MarketIntelComposeRequest):
+    scope = ResearchScope(
+        industry=payload.industry,
+        geography=payload.geography,
+        start_year=payload.start_year,
+        end_year=payload.end_year,
+        currency=payload.currency,
+    )
+    orchestrator = MultiAgentMarketIntelOrchestrator(scope)
+    return orchestrator.compose(payload.agent_outputs)

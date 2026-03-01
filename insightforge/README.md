@@ -113,6 +113,9 @@ Services:
 - `GET /api/reports/{id}/status` - Status message
 - `GET /api/reports/{id}/pdf` - Download PDF
 - `POST /api/reports/{id}/regenerate-section` - Re-run generation for selected section request
+- `POST /api/market-intel/prepare` - Build parallel Claude SaaS prompt packets (manual session mode)
+- `POST /api/market-intel/run` - Run in `saas` (packetized) or `api` (Claude API) mode
+- `POST /api/market-intel/compose` - Consolidate agent JSON outputs into Word-style industry report
 
 ## Financial Model Logic
 - Formula: `Future Value = Present × (1 + CAGR)^Years`
@@ -196,3 +199,41 @@ git push -u origin codex/insightforge-mvp
 ## Notes
 - This MVP intentionally avoids user auth to stay single-user and minimal.
 - Regenerate section currently re-runs the full pipeline while preserving requested section intent in status messaging.
+
+## Multi-Agent Market Intelligence System (Claude SaaS First)
+
+The backend now includes a modular orchestration package at `backend/app/market_intel` with:
+
+- Orchestrator agent
+- Market sizing agent
+- Segmentation agent
+- Trends agent
+- Technology intelligence agent
+- Competitive intelligence agent
+- Validation & credibility agent
+
+### Execution Modes
+
+- **SaaS Mode (`saas`)**: Creates parallel prompt packets for manual Claude web sessions.
+- **API Mode (`api`)**: Uses Anthropic API and the same prompt contracts/orchestration.
+
+Execution engines are isolated behind an interface so SaaS can be replaced by API without changing report structure logic.
+
+### Output Contract
+
+The composed report follows a Word-style structure with:
+
+1. Executive Summary
+2. Market Definition & Scope
+3. Market Size Estimation (Top-down, Bottom-up, Reconciliation, 5-year historical, chart placeholder)
+4. Full Segmentation (all required dimensions)
+5. Trends, Drivers, Barriers tables
+6. Traditional + Emerging Technology tables
+7. Competitive landscape
+8. Strategic insights
+
+Appended notes:
+
+- Appendix A: Source credibility table
+- Appendix B: Assumptions & adjustments
+- Appendix C: Citation list
