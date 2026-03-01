@@ -69,6 +69,7 @@ def _generate_report_impl(report_id: int) -> None:
                 published_at=src.get("published_at", ""),
                 raw_text=scraped["raw_text"],
                 cleaned_text=scraped["cleaned_text"],
+                relevance_score=src.get("relevance_score", 0.5),
             )
             db.add(source)
             db.flush()

@@ -22,6 +22,35 @@ CURATED_FALLBACK_LINKS = [
     "https://www.sec.gov/edgar/searchedgar/companysearch",
 ]
 
+BLOCKED_DOMAINS = {
+    "youtube.com",
+    "facebook.com",
+    "instagram.com",
+    "tiktok.com",
+    "x.com",
+    "twitter.com",
+    "linkedin.com",
+    "pinterest.com",
+    "reddit.com",
+}
+
+AUTHORITY_HINTS = [
+    ".gov",
+    "worldbank",
+    "oecd",
+    "imf",
+    "europa",
+    "un",
+    "statista",
+    "mckinsey",
+    "deloitte",
+    "pwc",
+    "fitch",
+    "gartner",
+    "bloomberg",
+    "reuters",
+]
+
 
 class ResearchAgent:
     def __init__(self) -> None:
@@ -31,18 +60,15 @@ class ResearchAgent:
     def run(self, industry: str, geography: str, limit: int = 20) -> list[dict]:
         size = min(limit, self.max_sources)
 
-        # Preferred mode: Parallel API
         if self.api_key:
             parallel_results = self._parallel_results(industry, geography, size)
             if parallel_results:
                 return parallel_results
 
-        # Dynamic fallback mode: live web search without API key
         dynamic_results = self._dynamic_web_results(industry, geography, size)
         if dynamic_results:
             return dynamic_results
 
-        # Final fallback if search providers are inaccessible
         return self._curated_fallback(industry, geography, size)
 
     def _parallel_results(self, industry: str, geography: str, limit: int) -> list[dict]:
@@ -59,28 +85,33 @@ class ResearchAgent:
             )
             response.raise_for_status()
             items = response.json().get("results", [])
-            return self._normalize_results(items, limit)
+            normalized = self._normalize_results(items, limit)
+            return self._finalize_results(normalized, industry, geography, limit)
         except Exception:
             return []
 
     def _dynamic_web_results(self, industry: str, geography: str, limit: int) -> list[dict]:
-        query_variants = [
-            f"{industry} market size {geography}",
-            f"{industry} CAGR forecast {geography}",
-            f"{industry} trends regulatory landscape {geography}",
-            f"{industry} competitive landscape key players {geography}",
-        ]
+        queries = self._query_variants(industry, geography)
 
         combined: list[dict] = []
-        for query in query_variants:
-            combined.extend(self._search_google_news_rss(query, per_query=8))
-            combined.extend(self._search_duckduckgo_html(query, per_query=8))
+        for query in queries:
+            combined.extend(self._search_google_news_rss(query, per_query=10))
+            combined.extend(self._search_duckduckgo_html(query, per_query=10))
 
-        deduped = self._dedupe(combined)
-        scored = self._score_relevance(deduped, industry, geography)
-        return scored[:limit]
+        return self._finalize_results(combined, industry, geography, limit)
 
-    def _search_google_news_rss(self, query: str, per_query: int = 8) -> list[dict]:
+    def _query_variants(self, industry: str, geography: str) -> list[str]:
+        return [
+            f"{industry} market size {geography}",
+            f"{industry} CAGR forecast {geography}",
+            f"{industry} market trends {geography}",
+            f"{industry} competitive landscape key players {geography}",
+            f"{industry} regulatory landscape {geography}",
+            f"{industry} TAM SAM SOM {geography}",
+            f"{industry} annual report market outlook {geography}",
+        ]
+
+    def _search_google_news_rss(self, query: str, per_query: int = 10) -> list[dict]:
         try:
             resp = requests.get(
                 "https://news.google.com/rss/search",
@@ -107,13 +138,14 @@ class ResearchAgent:
                         "url": clean_url,
                         "domain": urlparse(clean_url).netloc,
                         "published_at": pub_date,
+                        "snippet": "",
                     }
                 )
             return out
         except Exception:
             return []
 
-    def _search_duckduckgo_html(self, query: str, per_query: int = 8) -> list[dict]:
+    def _search_duckduckgo_html(self, query: str, per_query: int = 10) -> list[dict]:
         try:
             resp = requests.get(
                 "https://duckduckgo.com/html/",
@@ -124,13 +156,18 @@ class ResearchAgent:
             resp.raise_for_status()
 
             soup = BeautifulSoup(resp.text, "html.parser")
-            links = soup.select("a.result__a")[:per_query]
+            result_nodes = soup.select(".result")[:per_query]
 
             out = []
-            for anchor in links:
+            for node in result_nodes:
+                anchor = node.select_one("a.result__a")
+                if not anchor:
+                    continue
                 href = (anchor.get("href") or "").strip()
                 clean_url = self._extract_redirect_target(href)
                 title = anchor.get_text(" ", strip=True) or "Untitled Source"
+                snippet_node = node.select_one(".result__snippet")
+                snippet = snippet_node.get_text(" ", strip=True) if snippet_node else ""
                 if not clean_url:
                     continue
                 out.append(
@@ -139,6 +176,7 @@ class ResearchAgent:
                         "url": clean_url,
                         "domain": urlparse(clean_url).netloc,
                         "published_at": "",
+                        "snippet": snippet,
                     }
                 )
             return out
@@ -150,8 +188,6 @@ class ResearchAgent:
             return ""
 
         parsed = urlparse(url)
-
-        # Handle DDG redirect wrappers (/l/?uddg=...)
         if parsed.netloc.endswith("duckduckgo.com") and parsed.path.startswith("/l/"):
             qs = parse_qs(parsed.query)
             uddg = qs.get("uddg", [""])[0]
@@ -173,9 +209,24 @@ class ResearchAgent:
                     "url": url,
                     "domain": urlparse(url).netloc,
                     "published_at": i.get("published_at", ""),
+                    "snippet": i.get("snippet", ""),
                 }
             )
-        return self._dedupe(normalized)[:limit]
+        return normalized
+
+    def _finalize_results(self, items: list[dict], industry: str, geography: str, limit: int) -> list[dict]:
+        deduped = self._dedupe(items)
+        filtered = [x for x in deduped if self._is_valid_source(x)]
+        ranked = self._score_relevance(filtered, industry, geography)
+        diversified = self._enforce_domain_diversity(ranked, per_domain_limit=2)
+
+        if len(diversified) < max(6, limit // 2):
+            diversified.extend(self._curated_fallback(industry, geography, limit))
+            diversified = self._dedupe(diversified)
+            diversified = self._score_relevance(diversified, industry, geography)
+            diversified = self._enforce_domain_diversity(diversified, per_domain_limit=2)
+
+        return diversified[:limit]
 
     def _dedupe(self, items: list[dict]) -> list[dict]:
         seen = set()
@@ -191,33 +242,68 @@ class ResearchAgent:
             out.append(item)
         return out
 
+    def _is_valid_source(self, item: dict) -> bool:
+        domain = (item.get("domain") or "").lower()
+        title = (item.get("title") or "").lower()
+        url = (item.get("url") or "").lower()
+
+        if not domain:
+            return False
+        if any(blocked in domain for blocked in BLOCKED_DOMAINS):
+            return False
+        if any(x in url for x in ["/login", "/signin", "subscribe", "paywall", "accounts."]):
+            return False
+
+        market_signals = ["market", "cagr", "forecast", "industry", "analysis", "trend", "outlook", "report"]
+        if not any(sig in title or sig in url for sig in market_signals):
+            return False
+
+        return True
+
     def _score_relevance(self, items: list[dict], industry: str, geography: str) -> list[dict]:
         industry_terms = {t.lower() for t in industry.split() if t.strip()}
         geo_terms = {t.lower() for t in geography.split() if t.strip()}
-        intent_terms = {"market", "size", "forecast", "cagr", "industry", "analysis", "trend"}
+        intent_terms = {"market", "size", "forecast", "cagr", "industry", "analysis", "trend", "regulatory"}
 
-        def score(item: dict) -> float:
+        scored = []
+        for item in items:
             title = item.get("title", "").lower()
             url = item.get("url", "").lower()
-            text = f"{title} {url}"
+            snippet = item.get("snippet", "").lower()
+            text = f"{title} {snippet} {url}"
 
             token_hits = sum(1 for t in industry_terms if t in text)
             token_hits += sum(1 for t in geo_terms if t in text)
             token_hits += sum(1 for t in intent_terms if t in text)
 
-            authority_boost = 0
-            domain = item.get("domain", "")
-            if any(x in domain for x in ["gov", "oecd", "worldbank", "imf", "europa", "un", "statista", "mckinsey", "deloitte", "pwc"]):
-                authority_boost = 2
+            domain = (item.get("domain") or "").lower()
+            authority_boost = 2 if any(h in domain for h in AUTHORITY_HINTS) else 0
 
             freshness_boost = 0
             published = item.get("published_at", "")
             if str(datetime.utcnow().year) in str(published):
                 freshness_boost = 1
 
-            return float(token_hits + authority_boost + freshness_boost)
+            raw_score = float(token_hits + authority_boost + freshness_boost)
+            relevance_score = max(0.0, min(1.0, round(raw_score / 18.0, 3)))
 
-        return sorted(items, key=score, reverse=True)
+            scored_item = dict(item)
+            scored_item["relevance_score"] = relevance_score
+            scored.append(scored_item)
+
+        return sorted(scored, key=lambda x: x.get("relevance_score", 0), reverse=True)
+
+    def _enforce_domain_diversity(self, items: list[dict], per_domain_limit: int = 2) -> list[dict]:
+        out = []
+        domain_counts: dict[str, int] = {}
+        for item in items:
+            domain = item.get("domain", "")
+            cnt = domain_counts.get(domain, 0)
+            if cnt >= per_domain_limit:
+                continue
+            out.append(item)
+            domain_counts[domain] = cnt + 1
+        return out
 
     def _curated_fallback(self, industry: str, geography: str, limit: int) -> list[dict]:
         results = []
@@ -228,6 +314,8 @@ class ResearchAgent:
                     "url": url,
                     "domain": urlparse(url).netloc,
                     "published_at": "",
+                    "snippet": "",
+                    "relevance_score": 0.5,
                 }
             )
         return results
