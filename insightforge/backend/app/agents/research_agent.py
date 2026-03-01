@@ -54,6 +54,37 @@ AUTHORITY_HINTS = [
     "reuters",
 ]
 
+STRICT_AUTHORITY_DOMAINS = [
+    ".gov",
+    "oecd.org",
+    "worldbank.org",
+    "imf.org",
+    "europa.eu",
+    "europa.ec",
+    "un.org",
+    "unctad.org",
+    "unido.org",
+    "sec.gov",
+    "sedarplus.ca",
+    "fca.org.uk",
+    "esma.europa.eu",
+    "ec.europa.eu",
+]
+
+STRICT_SITE_FILTERS = [
+    "site:.gov",
+    "site:oecd.org",
+    "site:worldbank.org",
+    "site:imf.org",
+    "site:ec.europa.eu",
+    "site:europa.eu",
+    "site:un.org",
+    "site:unctad.org",
+    "site:unido.org",
+    "site:sec.gov",
+    "site:sedarplus.ca",
+]
+
 
 class ResearchAgent:
     def __init__(self) -> None:
@@ -78,6 +109,11 @@ class ResearchAgent:
             parallel_results = self._parallel_results(industry, geography, size)
             if parallel_results:
                 return parallel_results
+
+        if settings.strict_no_key_research:
+            strict_results = self._strict_no_key_results(industry, geography, size)
+            if strict_results:
+                return strict_results
 
         dynamic_results = self._dynamic_web_results(industry, geography, size)
         if dynamic_results:
@@ -114,6 +150,12 @@ class ResearchAgent:
                     continue
 
         if not combined:
+            if settings.strict_no_key_research:
+                strict = self._strict_no_key_results(industry, geography, size, section=section)
+                if strict:
+                    for item in strict:
+                        item["section"] = section
+                    return strict
             for query in queries:
                 combined.extend(self._search_google_news_rss(query, per_query=max(5, size)))
                 combined.extend(self._search_duckduckgo_html(query, per_query=max(5, size)))
@@ -121,6 +163,31 @@ class ResearchAgent:
         finalized = self._finalize_results(combined, industry, geography, size)
         for item in finalized:
             item["section"] = section
+        return finalized
+
+    def _strict_no_key_results(
+        self,
+        industry: str,
+        geography: str,
+        limit: int,
+        section: str | None = None,
+    ) -> list[dict]:
+        base_queries = self._query_variants_for_section(industry, geography, section) if section else self._query_variants(industry, geography)
+        authority_queries = []
+        for q in base_queries[:4]:
+            for filt in STRICT_SITE_FILTERS:
+                authority_queries.append(f"{q} {filt}")
+
+        combined: list[dict] = []
+        for query in authority_queries[: min(len(authority_queries), 24)]:
+            combined.extend(self._search_duckduckgo_html(query, per_query=max(4, limit)))
+            combined.extend(self._search_google_news_rss(query, per_query=max(3, limit)))
+
+        finalized = self._finalize_results(combined, industry, geography, limit, strict_authority_only=True)
+        if not finalized:
+            # Strict curated fallback retains high-authority institutions and filings.
+            fallback = self._curated_fallback(industry, geography, limit)
+            return self._finalize_results(fallback, industry, geography, limit, strict_authority_only=True)
         return finalized
 
     def _openai_web_results(
@@ -361,14 +428,23 @@ class ResearchAgent:
             )
         return normalized
 
-    def _finalize_results(self, items: list[dict], industry: str, geography: str, limit: int) -> list[dict]:
+    def _finalize_results(
+        self,
+        items: list[dict],
+        industry: str,
+        geography: str,
+        limit: int,
+        strict_authority_only: bool = False,
+    ) -> list[dict]:
         deduped = self._dedupe(items)
-        filtered = [x for x in deduped if self._is_valid_source(x)]
+        filtered = [x for x in deduped if self._is_valid_source(x, strict_authority_only=strict_authority_only)]
         ranked = self._score_relevance(filtered, industry, geography)
         diversified = self._enforce_domain_diversity(ranked, per_domain_limit=2)
 
         if len(diversified) < max(6, limit // 2):
-            diversified.extend(self._curated_fallback(industry, geography, limit))
+            fallback = self._curated_fallback(industry, geography, limit)
+            fallback = [x for x in fallback if self._is_valid_source(x, strict_authority_only=strict_authority_only)]
+            diversified.extend(fallback)
             diversified = self._dedupe(diversified)
             diversified = self._score_relevance(diversified, industry, geography)
             diversified = self._enforce_domain_diversity(diversified, per_domain_limit=2)
@@ -389,7 +465,7 @@ class ResearchAgent:
             out.append(item)
         return out
 
-    def _is_valid_source(self, item: dict) -> bool:
+    def _is_valid_source(self, item: dict, strict_authority_only: bool = False) -> bool:
         domain = (item.get("domain") or "").lower()
         title = (item.get("title") or "").lower()
         url = (item.get("url") or "").lower()
@@ -403,6 +479,9 @@ class ResearchAgent:
 
         market_signals = ["market", "cagr", "forecast", "industry", "analysis", "trend", "outlook", "report"]
         if not any(sig in title or sig in url for sig in market_signals):
+            return False
+
+        if strict_authority_only and not any(hint in domain for hint in STRICT_AUTHORITY_DOMAINS):
             return False
 
         return True

@@ -60,6 +60,7 @@ Also used:
 - `REDIS_URL`
 - `REPORTS_DIR`
 - `SYNC_TASKS`
+- `STRICT_NO_KEY_RESEARCH`
 - `NEXT_PUBLIC_API_BASE_URL`
 
 If `PARALLEL_API_KEY` is empty, the platform uses mock research sources.
@@ -70,6 +71,7 @@ Local mode defaults:
 - `DATABASE_URL=sqlite:///./insightforge.db`
 - `SYNC_TASKS=true` (no Celery worker needed)
 - Python 3.14 compatible install path (Postgres/PDF native deps are optional in local mode)
+- `STRICT_NO_KEY_RESEARCH=true` (authority-only sourcing when API keys are missing)
 
 ### Backend
 ```bash

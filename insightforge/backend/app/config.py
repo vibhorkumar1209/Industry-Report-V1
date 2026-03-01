@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     reports_dir: str = "reports"
     max_sources: int = 20
+    strict_no_key_research: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
