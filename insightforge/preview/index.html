@@ -680,17 +680,12 @@
         <section class="grid g1">
           <article class="card">
             <h3>Major Trends (Detailed 30-50 Words Each)</h3>
-            <div class="pair">
-              <div>
-                <table>
-                  <thead><tr><th>Major Trend</th><th>Detail (30-50 words)</th><th>Impact</th></tr></thead>
-                  <tbody>
-                    ${majorTrendsDetailed.map((d, i) => `<tr><td>${d.topic}</td><td>${d.detail}</td><td><span class="pill ${i === 0 ? "p-high" : "p-med"}">${i === 0 ? "High" : "Medium"}</span></td></tr>`).join("")}
-                  </tbody>
-                </table>
-              </div>
-              <div>${svgBars(majorTrendsDetailed, "score", "topic", "", { title: "Major Trends Impact", xLabel: "Impact Score", yLabel: "Trend" })}</div>
-            </div>
+            <table>
+              <thead><tr><th>Major Trend</th><th>Detail (30-50 words)</th><th>Impact</th></tr></thead>
+              <tbody>
+                ${majorTrendsDetailed.map((d, i) => `<tr><td>${d.topic}</td><td>${d.detail}</td><td><span class="pill ${i === 0 ? "p-high" : "p-med"}">${i === 0 ? "High" : "Medium"}</span></td></tr>`).join("")}
+              </tbody>
+            </table>
             <div class="analysis">${buildSectionCommentary("Major Trends Commentary", input, region)}</div>
           </article>
         </section>
@@ -698,17 +693,12 @@
         <section class="grid g1">
           <article class="card">
             <h3>Key Drivers (Detailed 30-50 Words Each)</h3>
-            <div class="pair">
-              <div>
-                <table>
-                  <thead><tr><th>Key Driver</th><th>Detail (30-50 words)</th><th>Intensity</th></tr></thead>
-                  <tbody>
-                    ${keyDriversDetailed.map((d, i) => `<tr><td>${d.topic}</td><td>${d.detail}</td><td>${d.score}</td></tr>`).join("")}
-                  </tbody>
-                </table>
-              </div>
-              <div>${svgBars(keyDriversDetailed, "score", "topic", "", { title: "Key Drivers Intensity", xLabel: "Intensity Score", yLabel: "Driver" })}</div>
-            </div>
+            <table>
+              <thead><tr><th>Key Driver</th><th>Detail (30-50 words)</th><th>Intensity</th></tr></thead>
+              <tbody>
+                ${keyDriversDetailed.map((d, i) => `<tr><td>${d.topic}</td><td>${d.detail}</td><td>${d.score}</td></tr>`).join("")}
+              </tbody>
+            </table>
             <div class="analysis">${buildSectionCommentary("Key Drivers Commentary", input, region)}</div>
           </article>
         </section>
@@ -716,17 +706,12 @@
         <section class="grid g1">
           <article class="card">
             <h3>Key Barriers (Detailed 30-50 Words Each)</h3>
-            <div class="pair">
-              <div>
-                <table>
-                  <thead><tr><th>Key Barrier</th><th>Detail (30-50 words)</th><th>Severity</th></tr></thead>
-                  <tbody>
-                    ${keyBarriersDetailed.map(d => `<tr><td>${d.topic}</td><td>${d.detail}</td><td>${d.score}</td></tr>`).join("")}
-                  </tbody>
-                </table>
-              </div>
-              <div>${svgBars(keyBarriersDetailed, "score", "topic", "", { title: "Key Barriers Severity", xLabel: "Severity Score", yLabel: "Barrier" })}</div>
-            </div>
+            <table>
+              <thead><tr><th>Key Barrier</th><th>Detail (30-50 words)</th><th>Severity</th></tr></thead>
+              <tbody>
+                ${keyBarriersDetailed.map(d => `<tr><td>${d.topic}</td><td>${d.detail}</td><td>${d.score}</td></tr>`).join("")}
+              </tbody>
+            </table>
             <div class="analysis">${buildSectionCommentary("Key Barriers Commentary", input, region)}</div>
           </article>
         </section>
