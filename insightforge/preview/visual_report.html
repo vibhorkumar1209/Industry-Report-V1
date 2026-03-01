@@ -75,6 +75,7 @@
     .grid { display: grid; gap: 14px; margin-top: 14px; }
     .g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
     .g2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .g1 { grid-template-columns: 1fr; }
     .card {
       background: var(--surface);
       border: 1px solid var(--line);
@@ -98,11 +99,26 @@
     .p-high { background: #ecfdf3; color: var(--good); }
     .p-med { background: #fff7ed; color: var(--warn); }
     .p-risk { background: #fef3f2; color: var(--bad); }
+    .pair {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .analysis {
+      margin-top: 10px;
+      background: #f6faff;
+      border: 1px solid #d9e6f7;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: #20354f;
+    }
     svg { width: 100%; height: auto; }
     @media (max-width: 980px) {
       .layout { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; }
-      .g3, .g2 { grid-template-columns: 1fr; }
+      .g3, .g2, .pair { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -112,6 +128,10 @@
       <h1>InsightForge AI</h1>
       <p>Dynamic Industry Intelligence Builder</p>
       <form id="controls">
+        <div class="field">
+          <label for="product">Product / Offering</label>
+          <input id="product" value="Clinical AI Platform" />
+        </div>
         <div class="field">
           <label for="industry">Industry</label>
           <input id="industry" value="AI in Healthcare" />
@@ -239,7 +259,7 @@
     }
 
     function makeSyntheticVisuals(input) {
-      const seed = hashSeed(input.industry + input.geo + input.horizon);
+      const seed = hashSeed(input.product + input.industry + input.geo + input.horizon);
       const model = deriveModelInputs(input.industry, input.geo, input.horizon);
       const tokens = input.industry.split(/\s+/).map(t => t.trim()).filter(Boolean);
       const anchor = tokens[0] || "Industry";
@@ -276,7 +296,7 @@
           }));
 
       return {
-        input_fingerprint: `${input.industry} | ${input.geo} | ${input.horizon}`,
+        input_fingerprint: `${input.product} | ${input.industry} | ${input.geo} | ${input.horizon}`,
         current_market_size_usd_billion: model.base,
         cagr_percent: model.cagr,
         forecast_table: forecast,
@@ -352,9 +372,61 @@
       }).join("");
     }
 
+    function svgBars(data, valueKey, labelKey, valueSuffix = "") {
+      const width = 520, barH = 24, gap = 12, pad = 40;
+      const items = (data || []).slice(0, 8);
+      const height = pad * 2 + items.length * (barH + gap);
+      const maxVal = Math.max(1, ...items.map(x => Number(x[valueKey] || 0)));
+      return `
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="bar chart">
+        ${items.map((item, i) => {
+          const y = pad + i * (barH + gap);
+          const v = Number(item[valueKey] || 0);
+          const w = Math.max(2, ((width - 230) * v) / maxVal);
+          const label = String(item[labelKey] || "Segment");
+          return `
+            <text x="6" y="${y + 16}" font-size="11" fill="#334155">${label.slice(0, 28)}</text>
+            <rect x="220" y="${y}" width="${w}" height="${barH}" fill="${PALETTE[i % PALETTE.length]}" rx="4"></rect>
+            <text x="${220 + w + 6}" y="${y + 16}" font-size="11" fill="#334155">${fmt(v)}${valueSuffix}</text>
+          `;
+        }).join("")}
+      </svg>`;
+    }
+
+    function svgTrendBars(dynamics) {
+      const mapImpact = (x) => x === "High" ? 3 : 2;
+      const rows = dynamics.map((d, i) => ({ label: `Trend ${i + 1}`, score: mapImpact(d.impact) }));
+      return svgBars(rows, "score", "label", "");
+    }
+
+    function svgScenarioLines(pessimistic, realistic, optimistic) {
+      const width = 720, height = 300, pad = 40;
+      const all = [...pessimistic, ...realistic, ...optimistic];
+      const maxY = Math.max(...all.map(x => x.value)) * 1.08;
+      const minY = Math.min(...all.map(x => x.value)) * 0.92;
+      const span = Math.max(1, maxY - minY);
+      const mapPts = (series) => series.map((d, i) => {
+        const x = pad + i * (width - 2 * pad) / Math.max(series.length - 1, 1);
+        const y = height - pad - ((d.value - minY) / span) * (height - 2 * pad);
+        return { x, y, year: d.year };
+      });
+      const p1 = mapPts(pessimistic), p2 = mapPts(realistic), p3 = mapPts(optimistic);
+      return `
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="scenario line chart">
+        <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#a6b6ca"/>
+        <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#a6b6ca"/>
+        <polyline fill="none" stroke="#b45309" stroke-width="2.5" points="${p1.map(p => `${p.x},${p.y}`).join(" ")}"/>
+        <polyline fill="none" stroke="#0b6bcb" stroke-width="2.5" points="${p2.map(p => `${p.x},${p.y}`).join(" ")}"/>
+        <polyline fill="none" stroke="#0f766e" stroke-width="2.5" points="${p3.map(p => `${p.x},${p.y}`).join(" ")}"/>
+        <text x="${width - 190}" y="30" font-size="11" fill="#b45309">Pessimistic</text>
+        <text x="${width - 190}" y="48" font-size="11" fill="#0b6bcb">Realistic</text>
+        <text x="${width - 190}" y="66" font-size="11" fill="#0f766e">Optimistic</text>
+      </svg>`;
+    }
+
     function renderReport(input, livePayload) {
       const reportEl = document.getElementById("report");
-      const seed = hashSeed(input.industry + input.geo + input.horizon);
+      const seed = hashSeed(input.product + input.industry + input.geo + input.horizon);
       const region = regionOf(input.geo);
       const hasLiveVisuals = !!(livePayload && livePayload.visuals && Array.isArray(livePayload.visuals.forecast_table) && livePayload.visuals.forecast_table.length);
       const modeLabel = hasLiveVisuals ? "LIVE BACKEND DATA" : "MODELED FALLBACK DATA";
@@ -424,6 +496,34 @@
         { name: "Optimistic", cagr: optimisticCagr, value: optEnd, assumptions: scenarioAssumptions("Optimistic", region) }
       ];
 
+      const sectionInsights = {
+        sizing: [
+          `${input.product} in ${input.industry} shows compounding adoption with strongest acceleration in the second half of the horizon.`,
+          `The realistic case is supported by delivery capacity and procurement cycles in ${region}.`,
+          `Sensitivity remains highest to integration lead-times and compliance interpretation velocity.`
+        ],
+        segmentation: [
+          `Segment concentration indicates where implementation resources should be prioritized in the next 12-18 months.`,
+          `Lower-share segments represent expansion whitespace but require channel and service adaptation.`,
+          `Portfolio strategy should align packaging with buyer maturity rather than one-size deployment.`
+        ],
+        dynamics: [
+          `High-impact themes should be converted into quarterly execution milestones and account playbooks.`,
+          `Barrier mitigation should be treated as a parallel workstream, not a post-sales activity.`,
+          `Regulatory-readiness messaging is a differentiator in enterprise evaluations.`
+        ],
+        competitive: [
+          `Top players retain share through ecosystem lock-in and faster implementation cycles.`,
+          `Mid-tier entrants can win by vertical specialization and outcome-linked contracts.`,
+          `Partnership architecture is now as important as raw model capability.`
+        ],
+        addendum: [
+          `Build an enablement program across sales, compliance, and delivery to shorten time-to-value.`,
+          `Adopt KPI instrumentation at deployment start: adoption depth, cycle-time reduction, and risk incidents.`,
+          `Institutionalize governance with model QA gates, audit trails, and escalation standards.`
+        ]
+      };
+
       const list = arr => `<ul>${arr.map(x => `<li>${x}</li>`).join("")}</ul>`;
       const bars = (arr) => arr.map((x, i) => `
         <div class="bar-row">
@@ -433,10 +533,10 @@
 
       reportEl.innerHTML = `
         <section class="hero">
-          <h2>${input.industry} Industry Intelligence</h2>
+          <h2>${input.product} - ${input.industry} Intelligence</h2>
           <p>${input.geo} | Forecast Horizon ${input.horizon} | Live API Analytical View</p>
           <p><span class="pill ${hasLiveVisuals ? "p-high" : "p-med"}">${modeLabel}</span></p>
-          <p class="small" style="color:#eaf5ff;">Input Fingerprint: ${visuals.input_fingerprint || (input.industry + " | " + input.geo + " | " + input.horizon)}</p>
+          <p class="small" style="color:#eaf5ff;">Input Fingerprint: ${visuals.input_fingerprint || (input.product + " | " + input.industry + " | " + input.geo + " | " + input.horizon)}</p>
           ${input.notes ? `<p><b>Custom angle:</b> ${input.notes}</p>` : ""}
         </section>
 
@@ -467,43 +567,86 @@
           <article class="card"><h3>Market Breakdown by Application</h3>${bars(appBreak)}</article>
           <article class="card"><h3>Market Breakdown by Type</h3>${bars(typeBreak)}</article>
         </section>
+        <section class="card">
+          <h3>Section Analysis: Market Structure</h3>
+          <div class="analysis">${list(sectionInsights.sizing)}</div>
+        </section>
 
         <section class="grid g2">
           <article class="card"><h3>Market Breakdown by End-Use</h3>${bars(endUseBreak)}</article>
           <article class="card"><h3>Market Breakdown by Category</h3>${bars(categoryBreak)}</article>
         </section>
+        <section class="card">
+          <h3>Section Analysis: Segmentation</h3>
+          <div class="analysis">${list(sectionInsights.segmentation)}</div>
+        </section>
 
-        <section class="grid g2">
+        <section class="grid g1">
           <article class="card">
             <h3>Market Dynamics (Detailed)</h3>
-            <table>
-              <thead><tr><th>Trend</th><th>Highlight</th><th>Impact</th><th>Examples</th></tr></thead>
-              <tbody>
-                ${marketDynamics.map(d => `<tr><td>${d.trend}</td><td>${d.highlight}</td><td><span class="pill ${d.impact === "High" ? "p-high" : "p-med"}">${d.impact}</span></td><td>${d.examples}</td></tr>`).join("")}
-              </tbody>
-            </table>
-          </article>
-          <article class="card">
-            <h3>Regional / Country Overview</h3>
-            <table>
-              <thead><tr><th>${region === "Global" ? "Region" : "Country"}</th><th>Share</th><th>Insight</th></tr></thead>
-              <tbody>
-                ${regionalRows.map(r => `<tr><td>${r.region}</td><td>${r.share}%</td><td>${r.note}</td></tr>`).join("")}
-              </tbody>
-            </table>
+            <div class="pair">
+              <div>
+                <table>
+                  <thead><tr><th>Trend</th><th>Highlight</th><th>Impact</th><th>Examples</th></tr></thead>
+                  <tbody>
+                    ${marketDynamics.map(d => `<tr><td>${d.trend}</td><td>${d.highlight}</td><td><span class="pill ${d.impact === "High" ? "p-high" : "p-med"}">${d.impact}</span></td><td>${d.examples}</td></tr>`).join("")}
+                  </tbody>
+                </table>
+              </div>
+              <div>${svgTrendBars(marketDynamics)}</div>
+            </div>
           </article>
         </section>
 
-        <section class="grid g2">
-          ${scenarioRows.map(s => `
-            <article class="card">
-              <h3>${s.name} Scenario</h3>
-              <div class="metric">USD ${fmt(s.value)}B</div>
-              <div class="small">${endYear} value | CAGR ${fmt(s.cagr)}%</div>
-              <h3 style="margin-top:12px">Detailed Assumptions</h3>
-              ${list(s.assumptions)}
-            </article>
-          `).join("")}
+        <section class="grid g1">
+          <article class="card">
+            <h3>Regional / Country Overview</h3>
+            <div class="pair">
+              <div>
+                <table>
+                  <thead><tr><th>${region === "Global" ? "Region" : "Country"}</th><th>Share</th><th>Insight</th></tr></thead>
+                  <tbody>
+                    ${regionalRows.map(r => `<tr><td>${r.region}</td><td>${r.share}%</td><td>${r.note}</td></tr>`).join("")}
+                  </tbody>
+                </table>
+              </div>
+              <div>${svgBars(regionalRows, "share", "region", "%")}</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="grid g1">
+          <article class="card">
+            <h3>Competitive Positioning</h3>
+            <div class="pair">
+              <div>
+                <table>
+                  <thead><tr><th>Company</th><th>Share</th><th>Positioning Insight</th></tr></thead>
+                  <tbody>
+                    ${playerShare.map(p => `<tr><td>${p.label}</td><td>${p.share}%</td><td>Defends share through delivery velocity, ecosystem strength, and enterprise trust.</td></tr>`).join("")}
+                  </tbody>
+                </table>
+              </div>
+              <div>${svgBars(playerShare, "share", "label", "%")}</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="grid g1">
+          <article class="card">
+            <h3>Scenario Table and Graph</h3>
+            <div class="pair">
+              <div>
+                <table>
+                  <thead><tr><th>Scenario</th><th>CAGR</th><th>${endYear} Value (USD Bn)</th><th>Assumptions</th></tr></thead>
+                  <tbody>
+                    ${scenarioRows.map(s => `<tr><td>${s.name}</td><td>${fmt(s.cagr)}%</td><td>${fmt(s.value)}</td><td>${s.assumptions.join("; ")}</td></tr>`).join("")}
+                  </tbody>
+                </table>
+              </div>
+              <div>${svgScenarioLines(pessimistic, realistic, optimistic)}</div>
+            </div>
+          </article>
         </section>
 
         <section class="card">
@@ -513,6 +656,25 @@
             <li><b>Localization pressure:</b> ${region} buyers increasingly prioritize local data-hosting, sovereign controls, and jurisdiction-ready compliance templates.</li>
             <li><b>Execution gap:</b> Winners will combine domain-specific applications with strong integration services and measurable business outcomes.</li>
           </ul>
+          <div class="analysis">${list(sectionInsights.dynamics)}</div>
+        </section>
+
+        <section class="card">
+          <h3>Section Analysis: Competitive Outlook</h3>
+          <div class="analysis">${list(sectionInsights.competitive)}</div>
+        </section>
+
+        <section class="card">
+          <h3>Strategic Execution Addendum (Non-Market)</h3>
+          <p class="small">This end section intentionally focuses on operating and execution priorities rather than additional market size or trend restatement.</p>
+          <ul>
+            <li><b>Operating Model Priorities:</b> define ownership for model risk, deployment QA, and post-go-live monitoring across product, compliance, and customer success.</li>
+            <li><b>Capability Roadmap:</b> sequence core platform hardening, implementation accelerators, and verticalized templates for faster enterprise onboarding.</li>
+            <li><b>Partnership Strategy:</b> deepen channel relationships with integrators and data ecosystem partners to reduce implementation friction.</li>
+            <li><b>Execution Risks:</b> monitor backlog conversion, integration timelines, and policy shifts that can affect sales cycle length.</li>
+            <li><b>KPI Framework:</b> track deployment cycle time, active-user depth, model quality drift, compliance exceptions, and realized customer ROI.</li>
+          </ul>
+          <div class="analysis">${list(sectionInsights.addendum)}</div>
         </section>
       `;
     }
@@ -559,7 +721,7 @@
       statusText.textContent = "Submitting report request...";
 
       const payload = {
-        industry: input.notes ? `${input.industry} (${input.notes})` : input.industry,
+        industry: input.notes ? `${input.product} for ${input.industry} (${input.notes})` : `${input.product} for ${input.industry}`,
         geography: input.geo,
         time_horizon: input.horizon,
         depth: input.depth,
@@ -599,6 +761,7 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const input = {
+        product: document.getElementById("product").value.trim() || "Product",
         industry: document.getElementById("industry").value.trim() || "Industry",
         geo: document.getElementById("geo").value,
         horizon: document.getElementById("horizon").value.trim() || "2024-2032",
@@ -617,6 +780,7 @@
     });
 
     renderReport({
+      product: "Clinical AI Platform",
       industry: "AI in Healthcare",
       geo: "Global",
       horizon: "2024-2032",
