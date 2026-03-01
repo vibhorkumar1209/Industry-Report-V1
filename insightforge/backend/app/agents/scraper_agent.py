@@ -12,7 +12,7 @@ class ScraperAgent:
             response = requests.get(url, timeout=20, headers={"User-Agent": "InsightForgeBot/1.0"})
             response.raise_for_status()
             html = response.text
-            soup = BeautifulSoup(html, "lxml")
+            soup = BeautifulSoup(html, "html.parser")
             for tag in soup(["script", "style", "noscript"]):
                 tag.decompose()
             text = re.sub(r"\s+", " ", soup.get_text(" ")).strip()

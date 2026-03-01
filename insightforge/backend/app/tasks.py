@@ -151,7 +151,7 @@ def _generate_report_impl(report_id: int) -> None:
 
         md_path.write_text(markdown_report, encoding="utf-8")
         html_path.write_text(html_report, encoding="utf-8")
-        write_pdf(html_report, str(pdf_path))
+        generated_pdf_path = write_pdf(html_report, str(pdf_path))
 
         for idx, src in enumerate(persisted_sources, start=1):
             db.add(
@@ -166,7 +166,7 @@ def _generate_report_impl(report_id: int) -> None:
 
         report.markdown_content = markdown_report
         report.html_content = html_report
-        report.pdf_path = str(pdf_path)
+        report.pdf_path = generated_pdf_path
         report.metadata_json = {
             "consensus": consensus,
             "forecast": forecast,

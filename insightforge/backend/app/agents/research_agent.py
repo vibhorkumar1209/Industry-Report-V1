@@ -123,7 +123,7 @@ class ResearchAgent:
             )
             resp.raise_for_status()
 
-            soup = BeautifulSoup(resp.text, "lxml")
+            soup = BeautifulSoup(resp.text, "html.parser")
             links = soup.select("a.result__a")[:per_query]
 
             out = []

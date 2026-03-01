@@ -69,6 +69,7 @@ If `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` are empty, deterministic local extract
 Local mode defaults:
 - `DATABASE_URL=sqlite:///./insightforge.db`
 - `SYNC_TASKS=true` (no Celery worker needed)
+- Python 3.14 compatible install path (Postgres/PDF native deps are optional in local mode)
 
 ### Backend
 ```bash

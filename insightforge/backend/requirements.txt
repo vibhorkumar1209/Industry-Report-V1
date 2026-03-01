@@ -1,5 +1,5 @@
 fastapi==0.111.1
-uvicorn[standard]==0.30.3
+uvicorn==0.30.3
 SQLAlchemy==2.0.31
 psycopg2-binary==2.9.9; python_version < "3.14"
 pydantic==2.8.2
@@ -9,9 +9,8 @@ celery==5.4.0
 redis==5.0.7
 requests==2.32.3
 beautifulsoup4==4.12.3
-lxml==5.2.2
 markdown==3.6
-weasyprint==62.3
+weasyprint==62.3; python_version < "3.14"
 openai==1.37.1
 anthropic==0.32.0
 python-multipart==0.0.9
