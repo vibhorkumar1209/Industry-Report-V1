@@ -446,11 +446,11 @@
     const form = document.getElementById("controls");
     function resolveApiBases() {
       const out = [];
+      out.push("http://127.0.0.1:8000");
+      out.push("http://localhost:8000");
       if (window.location.protocol.startsWith("http")) {
         out.push(window.location.origin);
       }
-      out.push("http://127.0.0.1:8000");
-      out.push("http://localhost:8000");
       return [...new Set(out)];
     }
 
@@ -470,8 +470,11 @@
           lastErr = err;
         }
       }
+      if (lastStatus && lastErr) {
+        throw new Error(`Backend not reachable on localhost and non-backend origin returned status ${lastStatus}. Open this preview locally and ensure FastAPI runs on port 8000.`);
+      }
       if (lastStatus) {
-        throw new Error(`No reachable backend accepted request (last status ${lastStatus}).`);
+        throw new Error(`No backend accepted request (last status ${lastStatus}). Ensure FastAPI is running on http://127.0.0.1:8000.`);
       }
       throw lastErr || new Error("Unable to reach backend.");
     }
