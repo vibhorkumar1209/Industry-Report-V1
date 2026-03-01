@@ -222,6 +222,57 @@
     }
 
     function fmt(n) { return Number(n).toFixed(1); }
+    function deriveModelInputs(industry, geo, horizon) {
+      const seed = hashSeed(industry + "|" + geo + "|" + horizon);
+      const region = regionOf(geo);
+      const regionFactor = {
+        "Global": 1.22,
+        "North America": 1.18,
+        "Europe": 1.08,
+        "Asia Pacific": 1.12,
+        "Latin America": 0.88,
+        "Middle East & Africa": 0.84
+      }[region] || 1.0;
+      const base = +(24 + seeded(seed + 5) * 78).toFixed(1) * regionFactor;
+      const cagr = +(6.2 + seeded(seed + 9) * 8.6).toFixed(1);
+      return { base: +base.toFixed(1), cagr };
+    }
+
+    function makeSyntheticVisuals(input) {
+      const seed = hashSeed(input.industry + input.geo + input.horizon);
+      const model = deriveModelInputs(input.industry, input.geo, input.horizon);
+      const yearsCfg = yearsFromHorizon(input.horizon);
+      const years = Array.from({ length: yearsCfg.end - yearsCfg.start + 1 }, (_, i) => yearsCfg.start + i);
+      const forecast = years.map((year, i) => ({
+        year,
+        market_size_usd_billion: +(model.base * Math.pow(1 + model.cagr / 100, i)).toFixed(2),
+      }));
+      const regional = regionOf(input.geo) === "Global"
+        ? Object.keys(GEO_DATA).filter(r => r !== "Global").map((r, i) => ({
+            region: r,
+            share_percent: [33, 24, 27, 9, 7][i] || 5,
+            summary: "Demand depth driven by digital maturity and policy structure.",
+          }))
+        : (GEO_DATA[regionOf(input.geo)] || [input.geo]).slice(0, 5).map((c, i) => ({
+            region: c,
+            share_percent: [34, 23, 19, 14, 10][i] || 8,
+            summary: "Market growth linked to provider transformation and data infrastructure.",
+          }));
+
+      return {
+        current_market_size_usd_billion: model.base,
+        cagr_percent: model.cagr,
+        forecast_table: forecast,
+        type_breakup: normalizeShares(["Platform", "Services", "Infrastructure", "Managed Solutions"], seed + 44).map(x => ({ label: x.label, share_percent: x.share })),
+        player_market_share: normalizeShares(["Microsoft", "Google", "AWS", "Oracle", "IBM"], seed + 111).map(x => ({ label: x.label, share_percent: x.share })),
+        market_dynamics: {
+          trends: ["AI copilots move from pilot to scaled deployment", "Procurement shifts to ROI-linked contracts", "Governance-first adoption model expands"],
+          drivers: ["Need for workflow automation", "Enterprise modernization spending", "Outcome-based vendor selection"],
+          barriers: ["Integration complexity", "Compliance and audit overhead", "Model monitoring requirements"],
+        },
+        regional_overview: regional,
+      };
+    }
 
     function scenarioAssumptions(type, region) {
       if (type === "Pessimistic") {
@@ -285,7 +336,8 @@
       const reportEl = document.getElementById("report");
       const seed = hashSeed(input.industry + input.geo + input.horizon);
       const region = regionOf(input.geo);
-      const visuals = livePayload.visuals || {};
+      const hasLiveVisuals = !!(livePayload && livePayload.visuals && Array.isArray(livePayload.visuals.forecast_table) && livePayload.visuals.forecast_table.length);
+      const visuals = hasLiveVisuals ? livePayload.visuals : makeSyntheticVisuals(input);
       const currentBase = Number(visuals.current_market_size_usd_billion || 0);
       const realisticCagr = Number(visuals.cagr_percent || 0);
       const { start, end } = yearsFromHorizon(input.horizon);
@@ -536,7 +588,8 @@
         renderReport(input, { visuals });
       } catch (err) {
         const msg = err && err.message ? err.message : "Unable to fetch live report.";
-        document.getElementById("statusText").textContent = `Error: ${msg}`;
+        document.getElementById("statusText").textContent = `Live fetch failed: ${msg}. Showing modeled preview.`;
+        renderReport(input, { visuals: makeSyntheticVisuals(input) });
       }
     });
 
