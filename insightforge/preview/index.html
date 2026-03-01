@@ -64,6 +64,14 @@
       cursor: pointer;
     }
     .main { padding: 20px; }
+    .empty-state {
+      background: #ffffff;
+      border: 1px dashed #b7c9dd;
+      border-radius: 12px;
+      padding: 22px;
+      color: #334155;
+      box-shadow: 0 6px 18px rgba(11, 19, 36, .06);
+    }
     .hero {
       background: linear-gradient(110deg, #0b6bcb, #0f766e);
       color: #fff;
@@ -602,6 +610,7 @@
           <p>${input.geo} | Forecast Horizon ${input.horizon} | Live API Analytical View</p>
           <p><span class="pill ${hasLiveVisuals ? "p-high" : "p-med"}">${modeLabel}</span></p>
           <p class="small" style="color:#eaf5ff;">Input Fingerprint: ${visuals.input_fingerprint || (input.product + " | " + input.industry + " | " + input.geo + " | " + input.horizon)}</p>
+          <p class="small" style="color:#eaf5ff;">Generated at: ${new Date().toLocaleString()}</p>
           ${input.notes ? `<p><b>Custom angle:</b> ${input.notes}</p>` : ""}
         </section>
 
@@ -806,6 +815,14 @@
 
     buildGeoOptions();
     const form = document.getElementById("controls");
+    const reportEl = document.getElementById("report");
+    reportEl.innerHTML = `
+      <section class="empty-state">
+        <h3 style="margin-top:0;">Generate Dynamic Report</h3>
+        <p>Select <b>Product / Offering</b>, <b>Industry</b>, <b>Geo Focus</b>, and horizon, then click <b>Generate Dynamic Report</b>.</p>
+        <p style="margin-bottom:0;">The page will generate a full report from your selected inputs instantly, and if a backend is reachable it will refresh with live pipeline output.</p>
+      </section>
+    `;
     function resolveApiBases() {
       const out = [];
       out.push("http://127.0.0.1:8000");
@@ -893,25 +910,22 @@
         depth: document.getElementById("depth").value,
         notes: document.getElementById("notes").value.trim()
       };
+      const statusText = document.getElementById("statusText");
+      statusText.textContent = "Generated from selected inputs (client-side). Trying live backend enrichment...";
+
+      // Immediate dynamic generation from user-selected inputs.
+      renderReport(input, { visuals: makeSyntheticVisuals(input) });
+
       try {
         const liveReport = await createAndFetchLiveReport(input);
         const visuals = (liveReport.metadata_json && liveReport.metadata_json.visuals) || {};
         renderReport(input, { visuals });
+        statusText.textContent = "Live backend enrichment complete.";
       } catch (err) {
         const msg = err && err.message ? err.message : "Unable to fetch live report.";
-        document.getElementById("statusText").textContent = `Live fetch failed: ${msg}. Showing modeled preview.`;
-        renderReport(input, { visuals: makeSyntheticVisuals(input) });
+        statusText.textContent = `Live backend unavailable: ${msg}. Showing input-driven generated report.`;
       }
     });
-
-    renderReport({
-      product: "Clinical AI Platform",
-      industry: "AI in Healthcare",
-      geo: "Global",
-      horizon: "2024-2032",
-      depth: "Professional",
-      notes: ""
-    }, { visuals: {} });
   </script>
 </body>
 </html>
