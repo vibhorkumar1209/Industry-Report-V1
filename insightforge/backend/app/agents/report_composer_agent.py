@@ -19,9 +19,20 @@ class ReportComposerAgent:
         insights: list[dict],
         consensus: dict,
         forecast: dict,
+        section_insights: dict[str, list[dict]] | None = None,
+        section_source_counts: dict[str, int] | None = None,
     ) -> dict:
         visuals = self.build_visual_payload(report_input, insights, consensus, forecast)
-        markdown = self._compose_markdown(report_input, sources, insights, consensus, forecast, visuals)
+        markdown = self._compose_markdown(
+            report_input,
+            sources,
+            insights,
+            consensus,
+            forecast,
+            visuals,
+            section_insights or {},
+            section_source_counts or {},
+        )
         return {"markdown": markdown, "visuals": visuals}
 
     def build_visual_payload(self, report_input: dict, insights: list[dict], consensus: dict, forecast: dict) -> dict:
@@ -45,7 +56,7 @@ class ReportComposerAgent:
             value = current_market_size / divisor if divisor else current_market_size
             historical.append({"year": year, "market_size_usd_billion": round(value, 2)})
 
-        app_labels, type_labels, end_use_labels, category_labels = self._segment_labels_for_industry(industry)
+        app_labels, type_labels, end_use_labels, category_labels = self._segment_labels_for_industry(industry, geography)
         application_breakup = self._build_shares(app_labels, f"{industry}-{geography}-application")
         type_breakup = self._build_shares(type_labels, f"{industry}-{geography}-type")
         end_use_breakup = self._build_shares(end_use_labels, f"{industry}-{geography}-enduse")
@@ -101,6 +112,8 @@ class ReportComposerAgent:
         consensus: dict,
         forecast: dict,
         visuals: dict,
+        section_insights: dict[str, list[dict]],
+        section_source_counts: dict[str, int],
     ) -> str:
         industry = report_input["industry"]
         geography = report_input["geography"]
@@ -146,6 +159,23 @@ class ReportComposerAgent:
             f"- **{company}**: Active across product innovation, distribution expansion, and strategic partnerships [1]."
             for company in companies[:10]
         )
+
+        section_lines = []
+        for section_key, count in section_source_counts.items():
+            section_label = section_key.replace("_", " ").title()
+            section_lines.append(f"- **{section_label}:** {count} sources analyzed")
+        section_coverage = "\n".join(section_lines) if section_lines else "- Section-level research coverage unavailable."
+
+        section_trend_snippets = []
+        for section_key, payloads in section_insights.items():
+            trend_counter = Counter()
+            for item in payloads:
+                for t in item.get("trends", []):
+                    trend_counter[t] += 1
+            top = [k for k, _ in trend_counter.most_common(2)]
+            if top:
+                section_trend_snippets.append(f"- **{section_key.replace('_', ' ').title()}**: {', '.join(top)}")
+        section_trend_notes = "\n".join(section_trend_snippets) if section_trend_snippets else "- Section trend synthesis unavailable."
 
         competitive_section = (
             "## Competitive Landscape\n"
@@ -203,6 +233,12 @@ class ReportComposerAgent:
 
 ## Market Overview
 The {industry} market in {geography} is transitioning from fragmented pilots to scaled deployments. Buyers are prioritizing measurable ROI, resilient operations, and vendor reliability [3].
+
+## Section-Wise Research Coverage (Batch Multi-Agent)
+{section_coverage}
+
+### Section Trend Synthesis
+{section_trend_notes}
 
 ## Historical to Current Market Size
 | Year | Market Size (USD Billion) |
@@ -280,34 +316,35 @@ The base-case forecast indicates sustained expansion through the planning horizo
 
         return [{"label": label, "share_percent": share} for label, share in zip(labels, shares)]
 
-    def _segment_labels_for_industry(self, industry: str) -> tuple[list[str], list[str], list[str], list[str]]:
+    def _segment_labels_for_industry(self, industry: str, geography: str) -> tuple[list[str], list[str], list[str], list[str]]:
         key = industry.lower()
+        geo_prefix = geography if geography.lower() != "global" else "Global"
 
         if "health" in key or "med" in key or "pharma" in key:
             return (
                 ["Clinical Decision Support", "Workflow Automation", "Patient Engagement", "Imaging Analytics", "Revenue Cycle"],
                 ["Platform Software", "Implementation Services", "Data Infrastructure", "Managed Solutions"],
-                ["Hospitals", "Payers", "Pharma/Biotech", "Diagnostics", "Public Health"],
-                ["Enterprise", "Mid-Market", "SMB", "Government/Nonprofit"],
+                [f"{geo_prefix} Hospitals", f"{geo_prefix} Payers", "Pharma/Biotech", "Diagnostics", "Public Health"],
+                [f"{geo_prefix} Enterprise", f"{geo_prefix} Mid-Market", "SMB", "Government/Nonprofit"],
             )
         if "energy" in key or "oil" in key or "gas" in key or "utility" in key:
             return (
                 ["Grid Optimization", "Demand Forecasting", "Asset Monitoring", "Trading Analytics", "Customer Platforms"],
                 ["Software", "Field Services", "Hardware/IoT", "Managed Operations"],
-                ["Utilities", "Industrial", "Commercial", "Residential", "Government"],
-                ["Regulated", "Liberalized", "Distributed", "Emerging Markets"],
+                [f"{geo_prefix} Utilities", "Industrial", "Commercial", "Residential", "Government"],
+                [f"{geo_prefix} Regulated", "Liberalized", "Distributed", "Emerging Markets"],
             )
         if "fin" in key or "bank" in key or "insur" in key:
             return (
                 ["Risk Analytics", "Fraud Detection", "Customer Intelligence", "Compliance Automation", "Digital Onboarding"],
                 ["Core Platforms", "Data/AI Services", "Cloud Infrastructure", "Managed Compliance"],
-                ["Banks", "Insurers", "Capital Markets", "Fintechs", "Regulators"],
-                ["Tier-1", "Tier-2/3", "Digital-native", "Public Sector"],
+                [f"{geo_prefix} Banks", "Insurers", "Capital Markets", "Fintechs", "Regulators"],
+                [f"{geo_prefix} Tier-1", "Tier-2/3", "Digital-native", "Public Sector"],
             )
 
         return (
             ["Core Operations", "Customer Experience", "Supply Chain", "Risk & Compliance", "Decision Intelligence"],
             ["Platform", "Services", "Infrastructure", "Managed Solutions"],
-            ["Large Enterprise", "Mid-Market", "SMB", "Public Sector", "Channel Partners"],
-            ["Premium", "Mainstream", "Value", "Emerging"],
+            [f"{geo_prefix} Large Enterprise", f"{geo_prefix} Mid-Market", "SMB", "Public Sector", "Channel Partners"],
+            [f"{geo_prefix} Premium", "Mainstream", "Value", "Emerging"],
         )

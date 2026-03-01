@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from sqlalchemy import delete
@@ -16,6 +18,15 @@ from app.database import SessionLocal
 from app.models import Citation, ExtractedInsight, Forecast, Report, Source
 from app.services.pdf_service import write_pdf
 from app.utils.markdown_utils import markdown_to_html
+
+SECTION_BATCH_PLAN = [
+    ("market_overview", 5),
+    ("market_size_forecast", 5),
+    ("market_dynamics", 5),
+    ("regulatory_landscape", 4),
+    ("competitive_landscape", 4),
+    ("financial_outlook", 4),
+]
 
 
 def _set_report_status(db, report: Report, status: str, message: str) -> None:
@@ -50,7 +61,46 @@ def _generate_report_impl(report_id: int) -> None:
         financial_agent = FinancialModelAgent()
         composer_agent = ReportComposerAgent()
 
-        sources_payload = research_agent.run(report.industry, report.geography, limit=settings.max_sources)
+        section_sources: dict[str, list[dict]] = {}
+        with ThreadPoolExecutor(max_workers=min(6, len(SECTION_BATCH_PLAN))) as executor:
+            futures = {
+                executor.submit(
+                    research_agent.run_for_section,
+                    report.industry,
+                    report.geography,
+                    section_name,
+                    section_limit,
+                ): section_name
+                for section_name, section_limit in SECTION_BATCH_PLAN
+            }
+            for future in as_completed(futures):
+                section_name = futures[future]
+                try:
+                    section_sources[section_name] = future.result()
+                except Exception:
+                    section_sources[section_name] = []
+
+        merged_by_url: dict[str, dict] = {}
+        for section_name, results in section_sources.items():
+            for src in results:
+                url = src.get("url", "").strip()
+                if not url:
+                    continue
+                if url not in merged_by_url:
+                    merged_by_url[url] = {**src, "sections": [section_name]}
+                else:
+                    existing_sections = merged_by_url[url].get("sections", [])
+                    if section_name not in existing_sections:
+                        existing_sections.append(section_name)
+                    if src.get("relevance_score", 0) > merged_by_url[url].get("relevance_score", 0):
+                        merged_by_url[url]["relevance_score"] = src.get("relevance_score", 0)
+                        merged_by_url[url]["title"] = src.get("title", merged_by_url[url].get("title", "Untitled Source"))
+
+        sorted_sources_payload = sorted(
+            merged_by_url.values(),
+            key=lambda x: (len(x.get("sections", [])), x.get("relevance_score", 0)),
+            reverse=True,
+        )[: settings.max_sources]
 
         db.execute(delete(Source).where(Source.report_id == report.id))
         db.execute(delete(ExtractedInsight).where(ExtractedInsight.report_id == report.id))
@@ -58,9 +108,21 @@ def _generate_report_impl(report_id: int) -> None:
         db.execute(delete(Citation).where(Citation.report_id == report.id))
         db.commit()
 
+        scraped_results: dict[str, dict] = {}
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            scrape_futures = {executor.submit(scraper_agent.run, src["url"]): src["url"] for src in sorted_sources_payload}
+            for future in as_completed(scrape_futures):
+                url = scrape_futures[future]
+                try:
+                    scraped_results[url] = future.result()
+                except Exception:
+                    scraped_results[url] = {"raw_text": "", "cleaned_text": ""}
+
         persisted_sources: list[Source] = []
-        for src in sources_payload[: settings.max_sources]:
-            scraped = scraper_agent.run(src["url"])
+        source_sections_by_id: dict[int, list[str]] = {}
+        section_source_counts: dict[str, int] = defaultdict(int)
+        for src in sorted_sources_payload:
+            scraped = scraped_results.get(src["url"], {"raw_text": "", "cleaned_text": ""})
             source = Source(
                 report_id=report.id,
                 title=src["title"],
@@ -74,13 +136,41 @@ def _generate_report_impl(report_id: int) -> None:
             db.add(source)
             db.flush()
             persisted_sources.append(source)
+            source_sections_by_id[source.id] = src.get("sections", [])
+            for section_name in src.get("sections", []):
+                section_source_counts[section_name] += 1
 
         _set_report_status(db, report, "Running", "Analyzing source documents")
 
         all_insights: list[dict] = []
+        section_insights: dict[str, list[dict]] = defaultdict(list)
+        source_insights: dict[int, dict] = {}
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            analysis_futures = {
+                executor.submit(analysis_agent.run, source.cleaned_text, report.industry, report.geography): source.id
+                for source in persisted_sources
+            }
+            for future in as_completed(analysis_futures):
+                source_id = analysis_futures[future]
+                try:
+                    source_insights[source_id] = future.result()
+                except Exception:
+                    source_insights[source_id] = {
+                        "market_size_usd_billion": None,
+                        "cagr_percent": None,
+                        "drivers": [],
+                        "restraints": [],
+                        "trends": [],
+                        "key_companies": [],
+                        "regulatory_notes": [],
+                        "confidence_score": 0.4,
+                    }
+
         for source in persisted_sources:
-            insight = analysis_agent.run(source.cleaned_text, report.industry, report.geography)
+            insight = source_insights.get(source.id, {})
             all_insights.append(insight)
+            for section_name in source_sections_by_id.get(source.id, []):
+                section_insights[section_name].append(insight)
             db.add(
                 ExtractedInsight(
                     report_id=report.id,
@@ -138,6 +228,8 @@ def _generate_report_impl(report_id: int) -> None:
             insights=all_insights,
             consensus=consensus,
             forecast=forecast,
+            section_insights=section_insights,
+            section_source_counts=dict(section_source_counts),
         )
         markdown_report = compose_result["markdown"]
         visuals_payload = compose_result["visuals"]
@@ -173,6 +265,7 @@ def _generate_report_impl(report_id: int) -> None:
             "forecast": forecast,
             "source_count": len(persisted_sources),
             "visuals": visuals_payload,
+            "section_source_counts": dict(section_source_counts),
         }
         _set_report_status(db, report, "Complete", "Report generated successfully")
 

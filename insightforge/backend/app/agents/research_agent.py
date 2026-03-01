@@ -71,6 +71,37 @@ class ResearchAgent:
 
         return self._curated_fallback(industry, geography, size)
 
+    def run_for_section(self, industry: str, geography: str, section: str, limit: int = 6) -> list[dict]:
+        size = min(limit, self.max_sources)
+        queries = self._query_variants_for_section(industry, geography, section)
+
+        combined: list[dict] = []
+        if self.api_key:
+            for query in queries:
+                try:
+                    payload = {"query": query, "limit": max(3, size)}
+                    response = requests.post(
+                        "https://api.parallel.ai/v1/search",
+                        json=payload,
+                        headers={"Authorization": f"Bearer {self.api_key}"},
+                        timeout=20,
+                    )
+                    response.raise_for_status()
+                    items = response.json().get("results", [])
+                    combined.extend(self._normalize_results(items, max(3, size)))
+                except Exception:
+                    continue
+
+        if not combined:
+            for query in queries:
+                combined.extend(self._search_google_news_rss(query, per_query=max(5, size)))
+                combined.extend(self._search_duckduckgo_html(query, per_query=max(5, size)))
+
+        finalized = self._finalize_results(combined, industry, geography, size)
+        for item in finalized:
+            item["section"] = section
+        return finalized
+
     def _parallel_results(self, industry: str, geography: str, limit: int) -> list[dict]:
         try:
             payload = {
@@ -110,6 +141,41 @@ class ResearchAgent:
             f"{industry} TAM SAM SOM {geography}",
             f"{industry} annual report market outlook {geography}",
         ]
+
+    def _query_variants_for_section(self, industry: str, geography: str, section: str) -> list[str]:
+        section_map = {
+            "market_overview": [
+                f"{industry} market overview {geography}",
+                f"{industry} industry outlook {geography}",
+                f"{industry} market trends and adoption {geography}",
+            ],
+            "market_size_forecast": [
+                f"{industry} market size {geography}",
+                f"{industry} CAGR forecast {geography}",
+                f"{industry} TAM SAM SOM {geography}",
+            ],
+            "market_dynamics": [
+                f"{industry} market drivers restraints {geography}",
+                f"{industry} key trends barriers {geography}",
+                f"{industry} opportunities threats {geography}",
+            ],
+            "regulatory_landscape": [
+                f"{industry} regulatory landscape {geography}",
+                f"{industry} compliance requirements {geography}",
+                f"{industry} policy framework {geography}",
+            ],
+            "competitive_landscape": [
+                f"{industry} competitive landscape key players {geography}",
+                f"{industry} market share companies {geography}",
+                f"{industry} company profiles {geography}",
+            ],
+            "financial_outlook": [
+                f"{industry} revenue forecast {geography}",
+                f"{industry} investment outlook {geography}",
+                f"{industry} demand forecast {geography}",
+            ],
+        }
+        return section_map.get(section, self._query_variants(industry, geography))
 
     def _search_google_news_rss(self, query: str, per_query: int = 10) -> list[dict]:
         try:
