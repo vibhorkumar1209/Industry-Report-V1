@@ -448,7 +448,7 @@
       const out = [];
       out.push("http://127.0.0.1:8000");
       out.push("http://localhost:8000");
-      if (window.location.protocol.startsWith("http")) {
+      if (window.location.protocol.startsWith("http") && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
         out.push(window.location.origin);
       }
       return [...new Set(out)];
