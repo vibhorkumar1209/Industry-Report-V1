@@ -296,31 +296,43 @@ class ResearchAgent:
                 f"{industry} market overview {geography}",
                 f"{industry} industry outlook {geography}",
                 f"{industry} market trends and adoption {geography}",
+                f"{industry} value chain analysis {geography}",
+                f"{industry} demand supply outlook {geography}",
             ],
             "market_size_forecast": [
                 f"{industry} market size {geography}",
                 f"{industry} CAGR forecast {geography}",
                 f"{industry} TAM SAM SOM {geography}",
+                f"{industry} historical market data {geography}",
+                f"{industry} revenue forecast {geography}",
             ],
             "market_dynamics": [
                 f"{industry} market drivers restraints {geography}",
                 f"{industry} key trends barriers {geography}",
                 f"{industry} opportunities threats {geography}",
+                f"{industry} demand drivers by segment {geography}",
+                f"{industry} risk factors policy shocks {geography}",
             ],
             "regulatory_landscape": [
                 f"{industry} regulatory landscape {geography}",
                 f"{industry} compliance requirements {geography}",
                 f"{industry} policy framework {geography}",
+                f"{industry} standards guidance enforcement {geography}",
+                f"{industry} regulatory updates approvals {geography}",
             ],
             "competitive_landscape": [
                 f"{industry} competitive landscape key players {geography}",
                 f"{industry} market share companies {geography}",
                 f"{industry} company profiles {geography}",
+                f"{industry} mergers acquisitions {geography}",
+                f"{industry} strategic partnerships ecosystem {geography}",
             ],
             "financial_outlook": [
                 f"{industry} revenue forecast {geography}",
                 f"{industry} investment outlook {geography}",
                 f"{industry} demand forecast {geography}",
+                f"{industry} capex opex trends {geography}",
+                f"{industry} valuation multiples outlook {geography}",
             ],
         }
         return section_map.get(section, self._query_variants(industry, geography))

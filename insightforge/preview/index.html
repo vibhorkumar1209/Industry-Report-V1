@@ -156,8 +156,8 @@
           <label for="depth">Depth</label>
           <select id="depth">
             <option>Basic</option>
-            <option selected>Professional</option>
-            <option>Investor-grade</option>
+            <option>Professional</option>
+            <option selected>Investor-grade</option>
           </select>
         </div>
         <div class="field">
@@ -347,8 +347,11 @@
       ];
     }
 
-    function svgLine(series) {
+    function svgLine(series, opts = {}) {
       const width = 720, height = 290, pad = 40;
+      const title = opts.title || "Market Size Trend";
+      const xLabel = opts.xLabel || "Year";
+      const yLabel = opts.yLabel || "USD Billion";
       const vals = series.map(s => s.value);
       const maxY = Math.max(...vals) * 1.08;
       const minY = Math.min(...vals) * 0.92;
@@ -361,8 +364,11 @@
       const poly = pts.map(p => `${p.x},${p.y}`).join(" ");
       return `
       <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="market trend">
+        <text x="${width / 2}" y="18" text-anchor="middle" font-size="13" fill="#1e293b">${title}</text>
         <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#a6b6ca"/>
         <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#a6b6ca"/>
+        <text x="${width / 2}" y="${height - 6}" text-anchor="middle" font-size="11" fill="#475569">${xLabel}</text>
+        <text x="12" y="${height / 2}" text-anchor="middle" font-size="11" fill="#475569" transform="rotate(-90 12 ${height / 2})">${yLabel}</text>
         <polyline fill="none" stroke="#0b6bcb" stroke-width="3" points="${poly}"/>
         ${pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3.8" fill="#0f766e"></circle><text x="${p.x}" y="${height - 12}" text-anchor="middle" font-size="10" fill="#334155">${p.year}</text>`).join("")}
       </svg>`;
@@ -380,13 +386,19 @@
       }).join("");
     }
 
-    function svgBars(data, valueKey, labelKey, valueSuffix = "") {
+    function svgBars(data, valueKey, labelKey, valueSuffix = "", opts = {}) {
       const width = 520, barH = 24, gap = 12, pad = 40;
+      const title = opts.title || "Distribution";
+      const xLabel = opts.xLabel || "Value";
+      const yLabel = opts.yLabel || "Categories";
       const items = (data || []).slice(0, 8);
       const height = pad * 2 + items.length * (barH + gap);
       const maxVal = Math.max(1, ...items.map(x => Number(x[valueKey] || 0)));
       return `
       <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="bar chart">
+        <text x="${width / 2}" y="18" text-anchor="middle" font-size="13" fill="#1e293b">${title}</text>
+        <text x="${width / 2}" y="${height - 6}" text-anchor="middle" font-size="11" fill="#475569">${xLabel}</text>
+        <text x="12" y="${height / 2}" text-anchor="middle" font-size="11" fill="#475569" transform="rotate(-90 12 ${height / 2})">${yLabel}</text>
         ${items.map((item, i) => {
           const y = pad + i * (barH + gap);
           const v = Number(item[valueKey] || 0);
@@ -404,7 +416,11 @@
     function svgTrendBars(dynamics) {
       const mapImpact = (x) => x === "High" ? 3 : 2;
       const rows = dynamics.map((d, i) => ({ label: `Trend ${i + 1}`, score: mapImpact(d.impact) }));
-      return svgBars(rows, "score", "label", "");
+      return svgBars(rows, "score", "label", "", {
+        title: "Trend Impact Score",
+        xLabel: "Relative Impact Score",
+        yLabel: "Trend Items"
+      });
     }
 
     function svgScenarioLines(pessimistic, realistic, optimistic) {
@@ -421,8 +437,11 @@
       const p1 = mapPts(pessimistic), p2 = mapPts(realistic), p3 = mapPts(optimistic);
       return `
       <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="scenario line chart">
+        <text x="${width / 2}" y="18" text-anchor="middle" font-size="13" fill="#1e293b">Scenario Forecast Comparison</text>
         <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#a6b6ca"/>
         <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" stroke="#a6b6ca"/>
+        <text x="${width / 2}" y="${height - 6}" text-anchor="middle" font-size="11" fill="#475569">Year</text>
+        <text x="12" y="${height / 2}" text-anchor="middle" font-size="11" fill="#475569" transform="rotate(-90 12 ${height / 2})">USD Billion</text>
         <polyline fill="none" stroke="#b45309" stroke-width="2.5" points="${p1.map(p => `${p.x},${p.y}`).join(" ")}"/>
         <polyline fill="none" stroke="#0b6bcb" stroke-width="2.5" points="${p2.map(p => `${p.x},${p.y}`).join(" ")}"/>
         <polyline fill="none" stroke="#0f766e" stroke-width="2.5" points="${p3.map(p => `${p.x},${p.y}`).join(" ")}"/>
@@ -623,7 +642,7 @@
         <section class="grid g2">
           <article class="card">
             <h3>Historical to Forecast Market Size (Realistic)</h3>
-            ${svgLine(realistic)}
+            ${svgLine(realistic, { title: "Historical to Forecast Market Size", xLabel: "Year", yLabel: "USD Billion" })}
             <div class="analysis">${buildSectionCommentary("Market Size Trajectory Commentary", input, region)}</div>
           </article>
           <article class="card">
@@ -634,6 +653,7 @@
                 <text y="4" text-anchor="middle" font-size="13" fill="#0b1324">Top 5 Players</text>
               </g>
             </svg>
+            <div class="small" style="margin-top:4px;"><b>Legend:</b> Colors map to players listed below in the same order.</div>
             ${bars(playerShare)}
             <div class="analysis">${buildSectionCommentary("Player Share Commentary", input, region)}</div>
           </article>
@@ -669,7 +689,7 @@
                   </tbody>
                 </table>
               </div>
-              <div>${svgBars(majorTrendsDetailed, "score", "topic", "")}</div>
+              <div>${svgBars(majorTrendsDetailed, "score", "topic", "", { title: "Major Trends Impact", xLabel: "Impact Score", yLabel: "Trend" })}</div>
             </div>
             <div class="analysis">${buildSectionCommentary("Major Trends Commentary", input, region)}</div>
           </article>
@@ -687,7 +707,7 @@
                   </tbody>
                 </table>
               </div>
-              <div>${svgBars(keyDriversDetailed, "score", "topic", "")}</div>
+              <div>${svgBars(keyDriversDetailed, "score", "topic", "", { title: "Key Drivers Intensity", xLabel: "Intensity Score", yLabel: "Driver" })}</div>
             </div>
             <div class="analysis">${buildSectionCommentary("Key Drivers Commentary", input, region)}</div>
           </article>
@@ -705,7 +725,7 @@
                   </tbody>
                 </table>
               </div>
-              <div>${svgBars(keyBarriersDetailed, "score", "topic", "")}</div>
+              <div>${svgBars(keyBarriersDetailed, "score", "topic", "", { title: "Key Barriers Severity", xLabel: "Severity Score", yLabel: "Barrier" })}</div>
             </div>
             <div class="analysis">${buildSectionCommentary("Key Barriers Commentary", input, region)}</div>
           </article>
@@ -723,7 +743,7 @@
                   </tbody>
                 </table>
               </div>
-              <div>${svgBars(regulatoryOverviewDetailed, "score", "topic", "")}</div>
+              <div>${svgBars(regulatoryOverviewDetailed, "score", "topic", "", { title: "Regulatory Priority", xLabel: "Priority Score", yLabel: "Regulatory Topic" })}</div>
             </div>
             <div class="analysis">${buildSectionCommentary("Regulatory Overview Commentary", input, region)}</div>
           </article>
@@ -741,7 +761,7 @@
                   </tbody>
                 </table>
               </div>
-              <div>${svgBars(regionalRows, "share", "region", "%")}</div>
+              <div>${svgBars(regionalRows, "share", "region", "%", { title: "Regional Share Distribution", xLabel: "Share (%)", yLabel: region === "Global" ? "Region" : "Country" })}</div>
             </div>
             <div class="analysis">${buildSectionCommentary("Regional Commentary", input, region)}</div>
           </article>
@@ -759,7 +779,7 @@
                   </tbody>
                 </table>
               </div>
-              <div>${svgBars(playerShare, "share", "label", "%")}</div>
+              <div>${svgBars(playerShare, "share", "label", "%", { title: "Player Market Share", xLabel: "Share (%)", yLabel: "Company" })}</div>
             </div>
             <div class="analysis">${buildSectionCommentary("Competitive Commentary", input, region)} ${list(sectionInsights.competitive)}</div>
           </article>
@@ -860,13 +880,13 @@
 
     async function createAndFetchLiveReport(input) {
       const statusText = document.getElementById("statusText");
-      statusText.textContent = "Submitting report request...";
+      statusText.textContent = "Submitting exhaustive investor-grade research request...";
 
       const payload = {
         industry: input.notes ? `${input.product} for ${input.industry} (${input.notes})` : `${input.product} for ${input.industry}`,
         geography: input.geo,
         time_horizon: input.horizon,
-        depth: input.depth,
+        depth: "Investor-grade",
         include_financial_forecast: true,
         include_competitive_landscape: true
       };

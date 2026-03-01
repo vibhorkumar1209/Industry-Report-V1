@@ -19,7 +19,7 @@ from app.models import Citation, ExtractedInsight, Forecast, Report, Source
 from app.services.pdf_service import write_pdf
 from app.utils.markdown_utils import markdown_to_html
 
-SECTION_BATCH_PLAN = [
+BASE_SECTION_BATCH_PLAN = [
     ("market_overview", 5),
     ("market_size_forecast", 5),
     ("market_dynamics", 5),
@@ -61,8 +61,10 @@ def _generate_report_impl(report_id: int) -> None:
         financial_agent = FinancialModelAgent()
         composer_agent = ReportComposerAgent()
 
+        section_batch_plan, depth_source_cap = _coverage_plan_for_depth(report.depth)
+
         section_sources: dict[str, list[dict]] = {}
-        with ThreadPoolExecutor(max_workers=min(6, len(SECTION_BATCH_PLAN))) as executor:
+        with ThreadPoolExecutor(max_workers=min(6, len(section_batch_plan))) as executor:
             futures = {
                 executor.submit(
                     research_agent.run_for_section,
@@ -71,7 +73,7 @@ def _generate_report_impl(report_id: int) -> None:
                     section_name,
                     section_limit,
                 ): section_name
-                for section_name, section_limit in SECTION_BATCH_PLAN
+                for section_name, section_limit in section_batch_plan
             }
             for future in as_completed(futures):
                 section_name = futures[future]
@@ -100,7 +102,7 @@ def _generate_report_impl(report_id: int) -> None:
             merged_by_url.values(),
             key=lambda x: (len(x.get("sections", [])), x.get("relevance_score", 0)),
             reverse=True,
-        )[: settings.max_sources]
+        )[:depth_source_cap]
 
         db.execute(delete(Source).where(Source.report_id == report.id))
         db.execute(delete(ExtractedInsight).where(ExtractedInsight.report_id == report.id))
@@ -264,6 +266,7 @@ def _generate_report_impl(report_id: int) -> None:
             "consensus": consensus,
             "forecast": forecast,
             "source_count": len(persisted_sources),
+            "research_depth_mode": report.depth,
             "visuals": visuals_payload,
             "section_source_counts": dict(section_source_counts),
         }
@@ -280,3 +283,15 @@ def _generate_report_impl(report_id: int) -> None:
         raise
     finally:
         db.close()
+
+
+def _coverage_plan_for_depth(depth: str) -> tuple[list[tuple[str, int]], int]:
+    normalized = (depth or "").strip()
+    if normalized == "Investor-grade":
+        # Exhaustive mode: deeper section pulls and broader overall source cap.
+        boosted = [(name, min(18, limit + 7)) for name, limit in BASE_SECTION_BATCH_PLAN]
+        return boosted, max(settings.max_sources, 45)
+    if normalized == "Professional":
+        boosted = [(name, min(14, limit + 3)) for name, limit in BASE_SECTION_BATCH_PLAN]
+        return boosted, max(settings.max_sources, 30)
+    return BASE_SECTION_BATCH_PLAN, settings.max_sources
