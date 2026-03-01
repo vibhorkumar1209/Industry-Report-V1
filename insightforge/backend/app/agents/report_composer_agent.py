@@ -45,8 +45,11 @@ class ReportComposerAgent:
             value = current_market_size / divisor if divisor else current_market_size
             historical.append({"year": year, "market_size_usd_billion": round(value, 2)})
 
-        type_labels = ["Platform Software", "Services", "Infrastructure", "Managed Solutions"]
-        type_breakup = self._build_shares(type_labels, industry)
+        app_labels, type_labels, end_use_labels, category_labels = self._segment_labels_for_industry(industry)
+        application_breakup = self._build_shares(app_labels, f"{industry}-{geography}-application")
+        type_breakup = self._build_shares(type_labels, f"{industry}-{geography}-type")
+        end_use_breakup = self._build_shares(end_use_labels, f"{industry}-{geography}-enduse")
+        category_breakup = self._build_shares(category_labels, f"{industry}-{geography}-category")
 
         player_labels = companies[:5] if companies else ["Player A", "Player B", "Player C", "Player D", "Player E"]
         player_shares = self._build_shares(player_labels, f"{industry}-{geography}-players")
@@ -75,7 +78,10 @@ class ReportComposerAgent:
             "cagr_percent": cagr_percent,
             "historical_market_size": historical,
             "forecast_table": forecast.get("table", []),
+            "application_breakup": application_breakup,
             "type_breakup": type_breakup,
+            "end_use_breakup": end_use_breakup,
+            "category_breakup": category_breakup,
             "player_market_share": player_shares,
             "regional_overview": regional_overview,
             "market_dynamics": {
@@ -273,3 +279,35 @@ The base-case forecast indicates sustained expansion through the planning horizo
             shares[0] += diff
 
         return [{"label": label, "share_percent": share} for label, share in zip(labels, shares)]
+
+    def _segment_labels_for_industry(self, industry: str) -> tuple[list[str], list[str], list[str], list[str]]:
+        key = industry.lower()
+
+        if "health" in key or "med" in key or "pharma" in key:
+            return (
+                ["Clinical Decision Support", "Workflow Automation", "Patient Engagement", "Imaging Analytics", "Revenue Cycle"],
+                ["Platform Software", "Implementation Services", "Data Infrastructure", "Managed Solutions"],
+                ["Hospitals", "Payers", "Pharma/Biotech", "Diagnostics", "Public Health"],
+                ["Enterprise", "Mid-Market", "SMB", "Government/Nonprofit"],
+            )
+        if "energy" in key or "oil" in key or "gas" in key or "utility" in key:
+            return (
+                ["Grid Optimization", "Demand Forecasting", "Asset Monitoring", "Trading Analytics", "Customer Platforms"],
+                ["Software", "Field Services", "Hardware/IoT", "Managed Operations"],
+                ["Utilities", "Industrial", "Commercial", "Residential", "Government"],
+                ["Regulated", "Liberalized", "Distributed", "Emerging Markets"],
+            )
+        if "fin" in key or "bank" in key or "insur" in key:
+            return (
+                ["Risk Analytics", "Fraud Detection", "Customer Intelligence", "Compliance Automation", "Digital Onboarding"],
+                ["Core Platforms", "Data/AI Services", "Cloud Infrastructure", "Managed Compliance"],
+                ["Banks", "Insurers", "Capital Markets", "Fintechs", "Regulators"],
+                ["Tier-1", "Tier-2/3", "Digital-native", "Public Sector"],
+            )
+
+        return (
+            ["Core Operations", "Customer Experience", "Supply Chain", "Risk & Compliance", "Decision Intelligence"],
+            ["Platform", "Services", "Infrastructure", "Managed Solutions"],
+            ["Large Enterprise", "Mid-Market", "SMB", "Public Sector", "Channel Partners"],
+            ["Premium", "Mainstream", "Value", "Emerging"],
+        )

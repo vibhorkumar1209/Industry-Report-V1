@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import random
 import re
+from hashlib import md5
 
 from anthropic import Anthropic
 
@@ -70,17 +71,32 @@ class AnalysisAgent:
                 "Shift to subscription-based offerings",
                 "Partnership-led go-to-market models",
             ],
-            "key_companies": [
-                "Microsoft",
-                "Google",
-                "Amazon",
-                "IBM",
-                "Oracle",
-                "Salesforce",
-            ],
+            "key_companies": self._company_candidates(industry),
             "regulatory_notes": [
                 f"Data governance and compliance obligations in {geography}",
                 "Sector-specific reporting and disclosure requirements",
             ],
             "confidence_score": round(random.uniform(0.55, 0.82), 2),
         }
+
+    def _company_candidates(self, industry: str) -> list[str]:
+        key = industry.lower()
+
+        if "health" in key or "med" in key or "pharma" in key:
+            base = ["UnitedHealth", "Pfizer", "Roche", "Medtronic", "Philips", "Siemens Healthineers", "Abbott"]
+        elif "energy" in key or "oil" in key or "gas" in key or "utility" in key:
+            base = ["Shell", "ExxonMobil", "Chevron", "BP", "TotalEnergies", "Schneider Electric", "Siemens"]
+        elif "fin" in key or "bank" in key or "insur" in key:
+            base = ["JPMorgan Chase", "Bank of America", "Citigroup", "HSBC", "Goldman Sachs", "BlackRock", "AIG"]
+        elif "auto" in key or "vehicle" in key:
+            base = ["Toyota", "Volkswagen", "Tesla", "BYD", "Hyundai", "GM", "Ford"]
+        elif "cloud" in key or "software" in key or "saas" in key or "ai" in key:
+            base = ["Microsoft", "Google", "Amazon", "IBM", "Oracle", "Salesforce", "SAP"]
+        else:
+            base = ["Microsoft", "Amazon", "Google", "IBM", "Oracle", "Accenture", "Siemens"]
+
+        # Deterministic rotation by industry keeps outputs dynamic per industry while stable per run.
+        digest = md5(industry.encode("utf-8")).hexdigest()
+        offset = int(digest[:4], 16) % len(base)
+        rotated = base[offset:] + base[:offset]
+        return rotated[:6]
