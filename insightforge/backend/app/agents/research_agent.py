@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+import re
 from datetime import datetime
 from urllib.parse import parse_qs, unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from openai import OpenAI
 
 from app.config import settings
 
@@ -56,9 +59,20 @@ class ResearchAgent:
     def __init__(self) -> None:
         self.api_key = settings.parallel_api_key
         self.max_sources = settings.max_sources
+        self.openai_client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
 
     def run(self, industry: str, geography: str, limit: int = 20) -> list[dict]:
         size = min(limit, self.max_sources)
+
+        if self.openai_client:
+            openai_results = self._openai_web_results(
+                industry=industry,
+                geography=geography,
+                queries=self._query_variants(industry, geography),
+                limit=size,
+            )
+            if openai_results:
+                return openai_results
 
         if self.api_key:
             parallel_results = self._parallel_results(industry, geography, size)
@@ -74,6 +88,13 @@ class ResearchAgent:
     def run_for_section(self, industry: str, geography: str, section: str, limit: int = 6) -> list[dict]:
         size = min(limit, self.max_sources)
         queries = self._query_variants_for_section(industry, geography, section)
+
+        if self.openai_client:
+            openai_results = self._openai_web_results(industry, geography, queries, size, section=section)
+            if openai_results:
+                for item in openai_results:
+                    item["section"] = section
+                return openai_results
 
         combined: list[dict] = []
         if self.api_key:
@@ -101,6 +122,66 @@ class ResearchAgent:
         for item in finalized:
             item["section"] = section
         return finalized
+
+    def _openai_web_results(
+        self,
+        industry: str,
+        geography: str,
+        queries: list[str],
+        limit: int,
+        section: str | None = None,
+    ) -> list[dict]:
+        if not self.openai_client:
+            return []
+
+        prompt = (
+            "Perform web research and return strict JSON array only. "
+            "Each object keys: title, url, published_at, snippet. "
+            f"Industry: {industry}. Geography: {geography}. "
+            f"Section: {section or 'general'}. "
+            f"Use these search intents: {queries[:4]}. "
+            f"Return up to {limit} high-quality sources."
+        )
+        try:
+            response = self.openai_client.responses.create(
+                model="gpt-4.1-mini",
+                tools=[{"type": "web_search_preview"}],
+                input=prompt,
+                temperature=0.1,
+                max_output_tokens=1400,
+            )
+            output_text = (response.output_text or "").strip()
+            items = self._parse_openai_items(output_text)
+            if not items:
+                return []
+            normalized = self._normalize_results(items, limit * 2)
+            return self._finalize_results(normalized, industry, geography, limit)
+        except Exception:
+            return []
+
+    def _parse_openai_items(self, text: str) -> list[dict]:
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return [x for x in parsed if isinstance(x, dict)]
+        except Exception:
+            pass
+
+        # Fallback parser if model does not return strict JSON.
+        urls = re.findall(r"https?://[^\s\]\)\"'>]+", text)
+        items = []
+        for idx, url in enumerate(urls[:20], start=1):
+            items.append(
+                {
+                    "title": f"Web Source {idx}",
+                    "url": url,
+                    "published_at": "",
+                    "snippet": "",
+                }
+            )
+        return items
 
     def _parallel_results(self, industry: str, geography: str, limit: int) -> list[dict]:
         try:
